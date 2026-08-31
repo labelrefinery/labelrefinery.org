@@ -54,6 +54,87 @@ import Base from "../layouts/Base.astro";
     <a class="button ghost" href="/data">How to read it →</a>
   </p>
 
+  <h2>What each pipeline actually produces</h2>
+
+  <p>
+    The three workflows are a chain, not three alternatives. Each one reads the
+    labels the previous one wrote and hands back a strictly richer set — same
+    schema, more known about every object.
+  </p>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Pipeline</th>
+          <th>Reads</th>
+          <th>Writes</th>
+          <th>What is new</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><a href="/pipelines#geo"><code>geo_kinetic_discovery</code></a></td>
+          <td>LiDAR sweeps, joint states</td>
+          <td><strong>Unnamed instances</strong> — box, heading, trajectory</td>
+          <td>That a discrete something is there, and where it goes</td>
+        </tr>
+        <tr>
+          <td><a href="/pipelines#bootstrap"><code>bootstrap_new_classes</code></a></td>
+          <td>Those instances, plus the four camera streams</td>
+          <td><strong>The same instances, named</strong> — each carrying <code>cls_conf</code> and <code>cls_source</code></td>
+          <td>What each thing is, and how much to trust the name</td>
+        </tr>
+        <tr>
+          <td><a href="/pipelines#improve"><code>improve_offboard_model</code></a></td>
+          <td>Named labels</td>
+          <td><strong>A trained detector, and a fresh label set from its output</strong></td>
+          <td>Objects the filter discarded; false positives it let through, removed</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    Only the third produces a model. The first two are search and naming — they
+    never learn anything, which is what lets the whole thing start from zero. And
+    because the third writes the same schema it reads, its output is a legal
+    input to itself: that is the loop, and round 2 is simply round 1 run again.
+  </p>
+
+  <h3>Where Grounding DINO comes in</h3>
+
+  <p>
+    It is the naming step in pipeline 2, and <em>only</em> the naming step. It
+    never proposes objects — geometry has already decided what exists. For each
+    instance the pipeline picks the camera views where it projects largest and
+    unoccluded, runs
+    <a href="https://github.com/labelrefinery/GroundingDino.mojo">Grounding DINO</a>
+    on those with the prompt <code>"excavator . haul truck . worker ."</code>,
+    matches each 2D detection to the projected 3D box by IoU, and votes across
+    views.
+  </p>
+
+  <p>
+    That division of labour is not an implementation detail, it is the finding
+    that shaped the pipeline. <strong>The detector names machines and cannot see
+    people</strong>: over ten unobstructed views it returned the correct
+    <code>haul truck</code> label nine times, and never once detected a worker
+    who was plainly visible in three of them.
+    <strong>Geometry finds people and cannot name machines</strong> — a worker
+    is an easy cluster and an unnameable one. So each is asked only what it is
+    good at, a size prior covers what the detector abstained on, and
+    <code>cls_source</code> records which path produced every name. That column
+    earns its place: detector-assigned names measured
+    <span class="stat">100%</span> correct, size-prior names
+    <span class="stat">67%</span>. A training step that cannot tell them apart
+    is wrong about a third of the second group.
+  </p>
+
+  <p>
+    Nothing human-labelled enters at any point in the chain.
+  </p>
+
   <h2>What is here</h2>
 
   <div class="cards">
@@ -69,6 +150,13 @@ import Base from "../layouts/Base.astro";
       <p>
         Three named workflows: discover instances from geometry, name them from
         pixels, distil a detector and label again.
+      </p>
+    </div>
+    <div class="card">
+      <h3><a href="/datasets">Datasets</a></h3>
+      <p>
+        Scenes, truth, prompts, labels and scores as one versioned, immutable
+        kind of thing. Iceberg on magmalake — designed, not yet built.
       </p>
     </div>
     <div class="card">

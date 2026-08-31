@@ -1,0 +1,245 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base
+  title="Datasets — labelrefinery"
+  description="Every artefact the system produces or consumes is a named, versioned, immutable dataset with recorded lineage. Iceberg on magmalake, Parquet underneath. A design, not yet built."
+>
+  <h1>Everything is a dataset</h1>
+
+  <p class="lead">
+    Scenes, ground truth, prompts, labels and scores are all the same kind of
+    thing: a named, versioned, immutable set of rows whose ancestry is recorded.
+    Treating them that way is what turns “which labels came from which prompt
+    against which truth” into a query rather than an archaeology project.
+  </p>
+
+  <div class="note">
+    <p>
+      <strong>This is a design, not a running system.</strong> The schemas and
+      the layout below are settled and written up in
+      <a href="https://github.com/labelrefinery/Refinery/blob/main/docs/DATASETS.md"
+        ><code>docs/DATASETS.md</code></a
+      >; none of it is implemented yet. Today the workflows still address data by
+      file path. What that costs, and what already exists to build on, is in
+      <a href="#status">status</a> at the bottom.
+    </p>
+  </div>
+
+  <h2>The concept</h2>
+
+  <p>
+    A dataset is <code>(name, version)</code>. Resolving it yields a set of rows
+    and the lineage that produced them.
+  </p>
+
+  <pre><code>name        labelrefinery.labels.site_seed1.round2
+version     0.3.0
+kind        labels
+rows        2 377
+parents     labelrefinery.labels.site_seed1.round1 @ 0.2.0
+            labelrefinery.prompts.construction @ 1.1.0
+produced_by improve_offboard_model  (git 6f49927, params &lbrace;...&rbrace;)
+snapshot    4612849022315…          ← the Iceberg snapshot this pins</code></pre>
+
+  <p>Three properties, and each one earns its keep.</p>
+
+  <p>
+    <strong>Named.</strong> A dataset is referred to by name, not by path.
+    <code>--labels runs/a/r2_labels.csv</code> is how the workflows address data
+    today. It is fine for one machine and hopeless for two — nothing about that
+    string says which scene, which round, or which filter produced it.
+  </p>
+
+  <p>
+    <strong>Versioned and immutable.</strong> A version is never rewritten. A
+    workflow that re-runs produces a <em>new</em> version, and anything that
+    consumed the old one still resolves to exactly the rows it saw. This is what
+    keeps a training run reproducible after a labeling bug is fixed upstream: the
+    old labels do not change underneath it, they simply stop being the newest.
+  </p>
+
+  <p>
+    <strong>Lineage-bearing.</strong> Every version records its parents and the
+    run that produced it. “Which labels are downstream of prompt v1.0.0” becomes
+    a graph walk over recorded edges rather than a guess from timestamps.
+  </p>
+
+  <h2>Five kinds</h2>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>Kind</th><th>What it holds</th><th>Written by</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>scene</code></td>
+          <td>One row per recording — URI, sha256, seed and the parameters that reproduce it</td>
+          <td><code>sitegen</code></td>
+        </tr>
+        <tr>
+          <td><code>ground_truth</code></td>
+          <td>The oracle, in three facets: <code>tracks</code>, <code>views</code>, <code>points</code></td>
+          <td>Derived from a scene's held-out topics</td>
+        </tr>
+        <tr>
+          <td><code>prompt</code></td>
+          <td>Versioned prompt sets, one row per phrase, each mapping to an ontology class</td>
+          <td>Hand-authored</td>
+        </tr>
+        <tr>
+          <td><code>labels</code></td>
+          <td>Anything a labeling workflow produced — the tracks columns plus provenance</td>
+          <td>All three pipelines</td>
+        </tr>
+        <tr>
+          <td><code>evaluation</code></td>
+          <td>Scores, long form: one row per metric per slice</td>
+          <td>The scorer</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    <strong>Scores are datasets too.</strong> A metric is a claim about two other
+    datasets and is meaningless without knowing which versions of them it
+    compared. Storing it as a first-class dataset with both parents recorded is
+    the only way an old number stays interpretable.
+  </p>
+
+  <h3>Why ground truth is one dataset with three facets</h3>
+
+  <p>
+    <code>tracks</code> is what the detection and tracking scorers read;
+    <code>views</code> is per-camera 2D boxes measured from instance masks, which
+    is what prompt validation reads; <code>points</code> is per-point instance
+    ids for segmentation. They share one identity space —
+    <code>instance_id</code> and <code>class</code> mean the same thing in all
+    three, because the same pass wrote them.
+  </p>
+
+  <p>
+    Keeping them one dataset rather than standing up a separate per-view golden
+    set is deliberate. A separate set can drift from the tracks, and then two
+    evaluations of the same run disagree about what was present.
+  </p>
+
+  <h3>Two schema choices that carry findings</h3>
+
+  <p>
+    <strong><code>num_lidar_points</code> lives in the truth</strong>, not in an
+    eval config. It is what lets a scorer say “recall on objects with ≥ 5
+    returns” instead of hard-coding <code>--exclude grade_stake</code>. The stake
+    is not a special case; it is the tail of a distribution, and a schema that
+    admits this stops the exclusion list from growing.
+  </p>
+
+  <p>
+    <strong>Prompts are one row per phrase</strong>, not per prompt string,
+    because <code>maps_to_class</code> is per phrase. That mapping is what turns
+    a detector's raw output into an ontology class without string-matching at the
+    call site — the mapping becomes data, versioned alongside the prompt that
+    needs it.
+  </p>
+
+  <h2>Layout on magmalake</h2>
+
+  <p>
+    Storage is <a href="https://iceberg.apache.org">Apache Iceberg</a> on
+    <a href="https://magmalake.org">magmalake</a>, Parquet underneath. Nothing
+    here needs a bespoke store — the properties wanted are exactly the ones a
+    table format already provides.
+  </p>
+
+  <pre><code>magmalake                              catalog
+└── labelrefinery                      namespace
+    ├── datasets                       the registry
+    ├── scenes
+    ├── ground_truth_tracks            partitioned by (dataset_name, day(t))
+    ├── ground_truth_views             partitioned by (dataset_name, camera)
+    ├── ground_truth_points            partitioned by (dataset_name)
+    ├── prompts
+    ├── labels                         partitioned by (dataset_name)
+    └── evaluations</code></pre>
+
+  <p>
+    The registry is the only new concept: it maps <code>(name, version)</code> to
+    a table and a <strong>pinned snapshot id</strong>, alongside the parents, the
+    workflow, its git sha and its params. Resolving a dataset is one lookup and
+    one snapshot-pinned scan.
+  </p>
+
+  <p>
+    <strong>A snapshot id rather than a timestamp</strong>, because Iceberg
+    snapshots are immutable by construction: a pinned read returns the same rows
+    forever, even after compaction, schema evolution or a later append to the
+    same table. A timestamp does not survive a rewrite.
+  </p>
+
+  <p>
+    <strong>One table per kind rather than one per dataset</strong>, because a
+    table per dataset means thousands of tables and a catalog nobody can list.
+    Partitioning by <code>dataset_name</code> gives the same pruning with one
+    schema to evolve, and the registry restores named-thing addressing on top.
+  </p>
+
+  <h2>Looking at them</h2>
+
+  <p>
+    The scene has <a href="/data">Foxglove</a>, which is why the labels are easy
+    to look at. The tables have no equivalent: <strong>there is no Iceberg viewer
+    here, and none is planned.</strong> magmalake is a set of libraries — Parquet,
+    Avro, Thrift, Iceberg and the codecs, implemented in Mojo — not a console.
+  </p>
+
+  <p>
+    So reading a dataset means querying it. Both of these already run against
+    magmalake tables as correctness oracles in its CI, so they are the supported
+    path rather than a workaround:
+  </p>
+
+  <pre><code>duckdb -c "SELECT class, count(*) FROM iceberg_scan('…/labels') GROUP BY 1"
+
+python -c "import pyiceberg.catalog as c; \
+  c.load_catalog('magmalake').load_table('labelrefinery.labels').scan().to_arrow()"</code></pre>
+
+  <div class="note">
+    <p>
+      The two viewing stories are different on purpose. A scene is something you
+      watch, and getting it wrong is obvious the moment you scrub the timeline. A
+      dataset is something you join, and getting it wrong looks like a plausible
+      number. The scene gets a viewer; the tables get a query engine and a pinned
+      snapshot.
+    </p>
+  </div>
+
+  <h2 id="status">Status</h2>
+
+  <p>
+    Designed and specified; not built. No pipeline writes Iceberg today — the
+    workflows read and write CSV and NPZ addressed by path, which is what the
+    <a href="/pipelines">pipelines page</a> shows.
+  </p>
+
+  <p>
+    The gap is smaller than it looks, and the reason is worth stating plainly:
+    the current CSVs already carry the right <em>columns</em>. What they are
+    missing is <em>identity</em>. Four moves close it — <code>sitegen truth</code>
+    to <code>ground_truth.tracks</code> with <code>num_lidar_points</code> added;
+    a new <code>sitegen views</code> export from the instance masks;
+    <code>name_instances.py</code>'s output to <code>labels</code>, its
+    <code>cls_source</code> and <code>cls_conf</code> already present; and the run
+    manifest to the registry.
+  </p>
+
+  <p>
+    The fourth is the one to notice. Every workflow already records its inputs,
+    outputs, params and hashes per step, into a JSON file per run — that is what
+    makes re-running a finished workflow cost a second. A dataset version is that
+    record with a name attached. <strong>This design does not add provenance
+    tracking; it moves provenance that already exists somewhere queryable.</strong>
+  </p>
+</Base>
