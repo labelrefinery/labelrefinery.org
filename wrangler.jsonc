@@ -6,5 +6,11 @@
   "assets": {
     "directory": "./dist",
     "not_found_handling": "404-page"
-  }
+  },
+  // Both hostnames serve the site; every page emits <link rel="canonical">
+  // pointing at the apex, so search engines are not offered two copies.
+  "routes": [
+    { "pattern": "labelrefinery.org", "custom_domain": true },
+    { "pattern": "www.labelrefinery.org", "custom_domain": true }
+  ]
 }
