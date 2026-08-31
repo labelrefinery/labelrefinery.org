@@ -4,7 +4,7 @@ import Base from "../layouts/Base.astro";
 
 <Base
   title="Datasets — labelrefinery"
-  description="Every artefact the system produces or consumes is a named, versioned, immutable dataset with recorded lineage. Iceberg on magmalake, Parquet underneath. A design, not yet built."
+  description="Every artefact the system produces or consumes is a named, versioned, immutable dataset with recorded lineage. Iceberg on magmalake, Parquet underneath — two tables published and browsable in the page."
 >
   <h1>Everything is a dataset</h1>
 
@@ -17,12 +17,14 @@ import Base from "../layouts/Base.astro";
 
   <div class="note">
     <p>
-      <strong>This is a design, not a running system.</strong> The schemas and
-      the layout below are settled and written up in
+      <strong>Two of the five kinds are live and you can page through them
+      <a href="#browse">further down this page</a>.</strong> The design is
+      written up in
       <a href="https://github.com/labelrefinery/Refinery/blob/main/docs/DATASETS.md"
         ><code>docs/DATASETS.md</code></a
-      >; none of it is implemented yet. Today the workflows still address data by
-      file path. What that costs, and what already exists to build on, is in
+      >, and the registry and resolver exist in
+      <code>workflows/datasets.py</code>. What is still missing, and which
+      columns are null in what is published, is in
       <a href="#status">status</a> at the bottom.
     </p>
   </div>
@@ -241,7 +243,7 @@ snapshot    4612849022315…          ← the Iceberg snapshot this pins</code><
 
   <pre><code>duckdb -c "INSTALL iceberg; LOAD iceberg;
   SELECT class, count(*), median(num_lidar_points)
-  FROM iceberg_scan('https://samples.magmalake.org/datasets/v0.1.0/ground_truth_tracks')
+  FROM iceberg_scan('https://samples.magmalake.org/datasets/v0.2.0/ground_truth_tracks')
   GROUP BY 1"</code></pre>
 
   <div class="note">
@@ -306,7 +308,7 @@ snapshot    4612849022315…          ← the Iceberg snapshot this pins</code><
 </Base>
 
 <script type="module" is:inline>
-  const BASE = "https://samples.magmalake.org/datasets/v0.1.0";
+  const BASE = "https://samples.magmalake.org/datasets/v0.2.0";
   const PAGE = 50;
 
   const el = (id) => document.getElementById(id);
