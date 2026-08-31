@@ -30,6 +30,29 @@ import Base from "../layouts/Base.astro";
   → RTS smoothing            Kalman.mojo — smooth_track
   → motion filter            the stage that decides whether the loop compounds</code></pre>
 
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Stage</th><th>Implementation</th><th>Paper</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>terrain classification</td>
+          <td><a href="https://github.com/labelrefinery/Stone.mojo"><code>Stone.mojo</code></a></td>
+          <td><a href="https://arxiv.org/abs/2603.09175">STONE</a> — Park et al., ICRA 2026</td>
+        </tr>
+        <tr>
+          <td>gated association</td>
+          <td><a href="https://github.com/labelrefinery/Hungarian.mojo"><code>Hungarian.mojo</code></a></td>
+          <td><a href="https://doi.org/10.1007/BF02278710">Jonker &amp; Volgenant</a>, Computing 38, 1987</td>
+        </tr>
+        <tr>
+          <td>offline smoothing</td>
+          <td><a href="https://github.com/labelrefinery/Kalman.mojo"><code>Kalman.mojo</code></a></td>
+          <td><a href="https://doi.org/10.2514/3.3166">Rauch, Tung &amp; Striebel</a>, AIAA Journal 3(8), 1965</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
   <p>What geometry and motion can actually settle:</p>
 
   <ul>
@@ -87,6 +110,19 @@ import Base from "../layouts/Base.astro";
   → vote              aggregate across views, confidence-weighted
   → size prior        for what the detector could not name</code></pre>
 
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Stage</th><th>Implementation</th><th>Paper</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>open-vocabulary detection</td>
+          <td><a href="https://github.com/labelrefinery/GroundingDino.mojo"><code>GroundingDino.mojo</code></a></td>
+          <td><a href="https://arxiv.org/abs/2303.05499">Grounding DINO</a> — Liu et al., ECCV 2024</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
   <p>
     <strong>The detector names machines and cannot see people.</strong> Over ten
     unobstructed views, nine returned <code>haul truck</code> with the correct
@@ -115,6 +151,41 @@ import Base from "../layouts/Base.astro";
   → infer            CenterPillars.mojo
   → track            the same association and smoothing as round 0
   → score            against the held-out oracle</code></pre>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Component</th><th>Implementation</th><th>Paper</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>pillar encoder</td>
+          <td rowspan="3"><a href="https://github.com/labelrefinery/CenterPillars.mojo"><code>CenterPillars.mojo</code></a> · <a href="https://github.com/labelrefinery/CenterPillars.py"><code>.py</code></a></td>
+          <td><a href="https://arxiv.org/abs/1812.05784">PointPillars</a> — Lang et al., CVPR 2019</td>
+        </tr>
+        <tr>
+          <td>BEV backbone</td>
+          <td><a href="https://www.mdpi.com/1424-8220/18/10/3337">SECOND</a> — Yan et al., Sensors 18(10), 2018</td>
+        </tr>
+        <tr>
+          <td>centre head</td>
+          <td><a href="https://arxiv.org/abs/2006.11275">CenterPoint</a> — Yin et al., CVPR 2021</td>
+        </tr>
+        <tr>
+          <td>association &amp; smoothing</td>
+          <td><a href="https://github.com/labelrefinery/Hungarian.mojo"><code>Hungarian.mojo</code></a> · <a href="https://github.com/labelrefinery/Kalman.mojo"><code>Kalman.mojo</code></a></td>
+          <td>as round 0, above</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    Two further stages are implemented and evaluated but not in the default
+    path — <a href="https://github.com/labelrefinery/OfflinePoly.mojo"><code>OfflinePoly.mojo</code></a>
+    (<a href="https://arxiv.org/abs/2602.13772">Offline-Poly</a>) and
+    <a href="https://github.com/labelrefinery/LabelFormer.mojo"><code>LabelFormer.mojo</code></a>
+    (<a href="https://arxiv.org/abs/2311.01444">LabelFormer</a>). What holds each
+    back is on the <a href="/papers">papers page</a>.
+  </p>
 
   <p>
     Nothing human-labelled enters at any point. The output is the same schema as

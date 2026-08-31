@@ -2,15 +2,16 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "labelrefinery-org",
   "compatibility_date": "2026-08-31",
+  // Keep the workers.dev URL alive as a fallback -- attaching the custom
+  // domain on a brand-new zone took the site offline once already.
+  "workers_dev": true,
   // Static assets only -- no Worker script. Astro builds to dist/.
   "assets": {
     "directory": "./dist",
     "not_found_handling": "404-page"
   },
-  // Both hostnames serve the site; every page emits <link rel="canonical">
-  // pointing at the apex, so search engines are not offered two copies.
-  "routes": [
-    { "pattern": "labelrefinery.org", "custom_domain": true },
-    { "pattern": "www.labelrefinery.org", "custom_domain": true }
-  ]
+  // Apex only. Attaching www at the same time triggered a certificate
+  // re-issue that took the apex down with it; add www separately, once the
+  // apex certificate is settled.
+  "routes": [{ "pattern": "labelrefinery.org", "custom_domain": true }]
 }
