@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "labelrefinery-org",
+  "compatibility_date": "2026-08-31",
+  // Static assets only -- no Worker script. Astro builds to dist/.
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page"
+  }
+}

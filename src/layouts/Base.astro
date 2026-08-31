@@ -1,0 +1,61 @@
+---
+import "../styles/global.css";
+
+const { title, description } = Astro.props;
+const path = Astro.url.pathname.replace(/\/$/, "") || "/";
+
+const nav = [
+  { href: "/", label: "Overview" },
+  { href: "/data", label: "The data" },
+  { href: "/pipelines", label: "Pipelines" },
+  { href: "/results", label: "Numbers & learnings" },
+  { href: "/papers", label: "Papers" },
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <link rel="canonical" href={new URL(path, Astro.site)} />
+  </head>
+  <body>
+    <header class="site">
+      <div class="wrap">
+        <a class="brand" href="/">labelrefinery</a>
+        <nav>
+          {
+            nav.map((item) => (
+              <a href={item.href} aria-current={path === item.href ? "page" : undefined}>
+                {item.label}
+              </a>
+            ))
+          }
+          <a href="https://github.com/labelrefinery">GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <div class="wrap">
+        <slot />
+      </div>
+    </main>
+
+    <footer class="site">
+      <div class="wrap">
+        <p>
+          Offboard auto-labeling for construction sites. Code on
+          <a href="https://github.com/labelrefinery">GitHub</a>, Apache 2.0.
+          Not affiliated with any of the papers implemented here.
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

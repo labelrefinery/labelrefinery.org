@@ -1,0 +1,307 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base
+  title="Numbers & learnings — labelrefinery"
+  description="What was measured across three rounds of a self-training auto-labeling loop, including the round that went backwards and why."
+>
+  <h1>Numbers &amp; learnings</h1>
+
+  <p class="lead">
+    Everything here was measured on one 60-second scene, scored against a
+    held-out oracle at a 2 m centre-distance threshold. The interesting parts are
+    the places the numbers disagreed with what had been written down first.
+  </p>
+
+  <h2>The loop is not monotonic</h2>
+
+  <figure>
+    <picture>
+      <source
+        media="(prefers-color-scheme: dark)"
+        srcset="/assets/rounds-dark.png"
+      />
+      <img
+        src="/assets/rounds-light.png"
+        alt="Line chart of precision, recall and F1 across three rounds. All three dip at round one and rise sharply at round two, with precision reaching 0.921 and F1 0.766."
+      />
+    </picture>
+  </figure>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Round</th>
+          <th class="num">TP</th>
+          <th class="num">FP</th>
+          <th class="num">Precision</th>
+          <th class="num">Recall</th>
+          <th class="num">F1</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>0 — geometry only</td>
+          <td class="num">1552</td><td class="num">824</td>
+          <td class="num">0.653</td><td class="num">0.647</td><td class="num">0.650</td>
+        </tr>
+        <tr>
+          <td>1 — unfiltered labels</td>
+          <td class="num">1424</td><td class="num">953</td>
+          <td class="num">0.599</td><td class="num">0.593</td><td class="num">0.596</td>
+        </tr>
+        <tr class="best">
+          <td>2 — filtered labels</td>
+          <td class="num">1574</td><td class="num">136</td>
+          <td class="num">0.921</td><td class="num">0.656</td><td class="num">0.766</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    <strong>Round one made things worse.</strong> Trained on the raw
+    pseudo-labels it inherited the systematic error and amplified it: 29.5% of
+    teacher rows sat on a stockpile, and 37.4% of round-one output did. The label
+    filter is not a refinement on the loop — it is what makes the loop work at
+    all.
+  </p>
+
+  <h2>The student beats its own supervision</h2>
+
+  <pre><code>training labels   precision 0.865   recall 0.547
+student output    precision 0.921   recall 0.656</code></pre>
+
+  <p>
+    Better on <em>both</em> axes. It recovered objects the filter had discarded
+    and rejected false positives the filter had let through. Given clean enough
+    examples the model's inductive bias works for you; below some label-precision
+    floor it works against you. Somewhere between 0.653 and 0.865 is where this
+    one flips — a more useful thing to know than any single score.
+  </p>
+
+  <p>
+    More precision is not always better, either. A stricter filter produced
+    cleaner labels (0.942) and a <em>worse</em> student (F1 0.737), having thrown
+    away a third of the training rows to get there.
+  </p>
+
+  <h2>The filter that worked was not the obvious one</h2>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Filter</th>
+          <th class="num">Rows</th>
+          <th class="num">Precision</th>
+          <th class="num">Recall</th>
+          <th class="num">F1</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>none</td>
+          <td class="num">2376</td><td class="num">0.653</td>
+          <td class="num">0.647</td><td class="num">0.650</td>
+        </tr>
+        <tr>
+          <td>teacher/student agreement</td>
+          <td class="num">1879</td><td class="num">0.673</td>
+          <td class="num">0.527</td><td class="num">0.591</td>
+        </tr>
+        <tr class="best">
+          <td>track motion (path ≥ 4 m)</td>
+          <td class="num">1518</td><td class="num">0.865</td>
+          <td class="num">0.547</td><td class="num">0.670</td>
+        </tr>
+        <tr>
+          <td>both</td>
+          <td class="num">1122</td><td class="num">0.942</td>
+          <td class="num">0.440</td><td class="num">0.600</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    Agreement — the obvious choice — is the <strong>weakest</strong>. In
+    hindsight it could not have worked: the student was trained on those labels,
+    so it corroborates the teacher's systematic errors rather than exposing them.
+  </p>
+
+  <p>
+    Motion works, and physically. A phantom is an artefact of which returns
+    survived ground removal in one sweep, so it neither persists nor travels —
+    median path length <span class="stat">0.75 m</span> against
+    <span class="stat">8.26 m</span> for a real object.
+  </p>
+
+  <h2>Terrain: connectivity beats thresholds</h2>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Terrain stage</th>
+          <th class="num">TP</th><th class="num">FP</th>
+          <th class="num">Precision</th><th class="num">ATE</th><th class="num">ASE</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>none</td><td class="num">1555</td><td class="num">2189</td><td class="num">0.415</td><td class="num">0.379</td><td class="num">0.575</td></tr>
+        <tr><td>per-cell threshold</td><td class="num">1555</td><td class="num">1700</td><td class="num">0.478</td><td class="num">0.365</td><td class="num">0.577</td></tr>
+        <tr><td>region growing</td><td class="num">1542</td><td class="num">782</td><td class="num">0.664</td><td class="num">0.445</td><td class="num">0.705</td></tr>
+        <tr class="best"><td>growing + step guard</td><td class="num">1552</td><td class="num">824</td><td class="num">0.653</td><td class="num">0.365</td><td class="num">0.576</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    <strong>62% fewer false positives than the baseline, three true positives
+    lost out of 1555, box quality unchanged.</strong> Pure region growing scores
+    marginally better on precision and materially worse on everything about the
+    boxes — a truck's lowest visible return sits inside the repose allowance, so
+    the fill climbs onto vehicles and leaves floating tops. Connectivity decides
+    where terrain extends; a per-cell thickness guard decides what is eligible to
+    be terrain at all. Neither works alone.
+  </p>
+
+  <h2>Reading AOE properly</h2>
+
+  <p>
+    Orientation error runs 0 to π/2, and a <em>uniformly random</em> heading
+    averages 0.785. Geometry's PCA heading scored
+    <span class="stat">0.750</span> — statistically indistinguishable from a coin
+    flip. It carried no information at all. One round of distillation took it to
+    <span class="stat">0.553</span>, which is genuinely informative.
+  </p>
+
+  <p>
+    That is the clearest case for the learned stages. A cluster is an object's
+    <em>visible surface</em>, not the object: a truck lit from one side has no
+    far side in the cloud, so the box is short in depth and the principal axis
+    follows the illuminated face. The missing information is not in the sweep to
+    be extracted. It is in the trajectory, and in a size prior only a trained
+    model carries.
+  </p>
+
+  <h2>Naming: one source is trustworthy, the other is not</h2>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Name source</th>
+          <th class="num">Correct</th><th class="num">Wrong</th>
+          <th class="num">Phantom</th><th class="num">Precision</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="best"><td>detector</td><td class="num">7</td><td class="num">0</td><td class="num">0</td><td class="num">1.000</td></tr>
+        <tr><td>size prior</td><td class="num">2</td><td class="num">1</td><td class="num">7</td><td class="num">0.667</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    Every name the detector gave was right. The size prior's failure is
+    structural: <strong>it cannot abstain</strong> — shown a cluster of stockpile
+    it will confidently return <code>person</code>. So an instance the detector
+    was shown and did not corroborate is now recorded as <code>unknown</code>
+    rather than guessed at. Detector silence is evidence.
+  </p>
+
+  <h2>Recall depends on what you count</h2>
+
+  <p>
+    The first honest score came out at recall <span class="stat">0.27</span>,
+    which felt wrong. Breaking the oracle down by class explained it: grade
+    stakes are 60% of all ground-truth rows, and a stake is 50 mm square and
+    collects a couple of returns per sweep. Excluding them, the same run scores
+    <span class="stat">0.69</span>.
+  </p>
+
+  <p>
+    Nothing about the pipeline changed. The metric had been measuring the LiDAR
+    rather than the labeler.
+  </p>
+
+  <h2>Synthetic pixels are not photographs</h2>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>Input</th><th>Grounding DINO, same weights and prompt</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>real construction photo</td>
+          <td><code>excavator</code> 0.858, <code>haul truck</code> 0.771</td>
+        </tr>
+        <tr>
+          <td>synthetic render, 9 of 10 views</td>
+          <td><code>haul truck</code> 0.351 – 0.421 — correct label each time</td>
+        </tr>
+        <tr>
+          <td>workers, visible in 3 views</td>
+          <td>never detected, not once</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    The control proves the model and prompt are fine. Untextured geometry does
+    not carry what an open-vocabulary detector keys on. Enough to build a naming
+    pipeline on; not enough to trust its labels.
+  </p>
+
+  <p>
+    Camera placement mattered more than expected. A single centre-forward camera
+    spent <span class="stat">22.8%</span> of every frame looking at its own boom,
+    and that boom captured the only detection it made. Four cameras at the house
+    corners, panned outward: <span class="stat">0.0%</span> ego occlusion at
+    every swing angle — and the label changed from “excavator haul” on the
+    machine's own boom to <code>haul truck</code> on the actual truck.
+  </p>
+
+  <h2>What the numbers changed</h2>
+
+  <p>
+    Five times a measurement contradicted what had already been written down, and
+    each time the write-up changed rather than the number:
+  </p>
+
+  <ul>
+    <li>
+      The obvious LiDAR mount fired two thirds of its beams into its own cab —
+      caught by checking the return histogram, not by looking at a render.
+    </li>
+    <li>
+      Recall was measuring the sensor, not the method.
+    </li>
+    <li>
+      Thresholding cells was the wrong <em>shape</em> of answer; the question was
+      connectivity.
+    </li>
+    <li>
+      “More refinement will help” — it did not. Adding an offline tracking stage
+      improved what it derives from trajectory and degraded what it takes on
+      faith from the boxes.
+    </li>
+    <li>
+      The label filter expected to work was the weakest of three.
+    </li>
+  </ul>
+
+  <p>
+    The full build log, including the bugs that plausible-looking numbers nearly
+    hid, is in
+    <a href="https://github.com/labelrefinery/Refinery/blob/main/docs/JOURNAL.md"
+      >Refinery's journal</a
+    >.
+  </p>
+</Base>

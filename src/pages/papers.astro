@@ -1,0 +1,205 @@
+---
+import Base from "../layouts/Base.astro";
+
+const active = [
+  {
+    title: "STONE: A Scalable Multi-Modal Surround-View 3D Traversability Dataset for Off-Road Robot Navigation",
+    authors: "Park et al., ICRA 2026",
+    href: "https://arxiv.org/abs/2603.09175",
+    repo: "Stone.mojo",
+    where: "geo_kinetic_discovery",
+    role: "Per-cell plane fits over a 2.5-D grid, calibrated from the machine's own driven path. Supplies the terrain stage — adapted to reason about connectivity rather than traversability, because slope separates drivable ground from a pile and must not separate terrain from an object.",
+  },
+  {
+    title: "A shortest augmenting path algorithm for dense and sparse linear assignment problems",
+    authors: "Jonker & Volgenant, Computing 38, 1987",
+    href: "https://doi.org/10.1007/BF02278710",
+    repo: "Hungarian.mojo",
+    where: "all three pipelines",
+    role: "Data association, frame to frame. Extended with a distance gate so a track whose object left the scene goes unmatched rather than being bound to whatever is cheapest.",
+  },
+  {
+    title: "Maximum likelihood estimates of linear dynamic systems",
+    authors: "Rauch, Tung & Striebel, AIAA Journal 3(8), 1965",
+    href: "https://doi.org/10.2514/3.3166",
+    repo: "Kalman.mojo",
+    where: "geo_kinetic_discovery, improve_offboard_model",
+    role: "The RTS backward pass — the offboard advantage in one algorithm. Every frame is conditioned on the whole trajectory, so early distant detections inherit the accuracy of later close ones.",
+  },
+  {
+    title: "Grounding DINO: Marrying DINO with Grounded Pre-Training for Open-Set Object Detection",
+    authors: "Liu et al., ECCV 2024",
+    href: "https://arxiv.org/abs/2303.05499",
+    repo: "GroundingDino.mojo",
+    where: "bootstrap_new_classes",
+    role: "Names instances from a text prompt. Measured on this data: perfect precision on the machines it does detect, and blind to people — which is why the size prior sits beside it rather than under it.",
+  },
+  {
+    title: "PointPillars: Fast Encoders for Object Detection from Point Clouds",
+    authors: "Lang et al., CVPR 2019",
+    href: "https://arxiv.org/abs/1812.05784",
+    repo: "CenterPillars",
+    where: "improve_offboard_model",
+    role: "The pillar encoder — points scattered into a BEV grid.",
+  },
+  {
+    title: "SECOND: Sparsely Embedded Convolutional Detection",
+    authors: "Yan et al., Sensors 18(10), 2018",
+    href: "https://www.mdpi.com/1424-8220/18/10/3337",
+    repo: "CenterPillars",
+    where: "improve_offboard_model",
+    role: "The BEV backbone with a multi-scale concat neck.",
+  },
+  {
+    title: "Center-based 3D Object Detection and Tracking",
+    authors: "Yin et al., CVPR 2021",
+    href: "https://arxiv.org/abs/2006.11275",
+    repo: "CenterPillars",
+    where: "improve_offboard_model",
+    role: "The centre head — per-class Gaussian heatmaps plus box regression. No anchors, no rotated-IoU NMS. This is the distilled student that turns geometry's pseudo-labels into a model with a shape prior.",
+  },
+];
+
+const implemented = [
+  {
+    title: "Offline-Poly: A Polyhedral Framework For Offline 3D Multi-Object Tracking",
+    authors: "Li et al., 2026",
+    href: "https://arxiv.org/abs/2602.13772",
+    repo: "OfflinePoly.mojo",
+    status: "Evaluated, not currently in the default path",
+    role: "Learning-free offline MOT that fuses tracklets from several upstream trackers. Measured here: it improves what it derives from trajectory (heading) and degrades what it takes on faith from the boxes (size), because it was designed downstream of a detector that emits well-formed boxes. A good stage waiting for a good input.",
+  },
+  {
+    title: "LabelFormer: Object Trajectory Refinement for Offboard Perception from LiDAR Point Clouds",
+    authors: "Yang et al., CoRL 2023",
+    href: "https://arxiv.org/abs/2311.01444",
+    repo: "LabelFormer.mojo",
+    status: "Needs a domain checkpoint",
+    role: "Refines a whole trajectory rather than a frame — which is exactly what orientation error needs, and the clearest remaining target on this data.",
+  },
+  {
+    title: "Offline Tracking with Object Permanence",
+    authors: "Liu & Caesar, 2023",
+    href: "https://arxiv.org/abs/2310.01288",
+    repo: "TrackPermanence.mojo",
+    status: "Needs a domain checkpoint",
+    role: "Re-identifies a terminated tracklet with a later one and regresses the occluded poses between — the stage aimed at the dust and stockpile occlusions this scene generates deliberately.",
+  },
+];
+
+const referenced = [
+  {
+    title: "3D Point Cloud Dataset of Heavy Construction Equipment (3D-ConHE)",
+    href: "https://www.mdpi.com/2076-3417/14/9/3599",
+    role: "CAD models of excavators, dump trucks, dozers, graders and rollers. Raycasting these instead of cuboids is the clearest path to narrowing the synthetic-imagery gap.",
+  },
+  {
+    title: "Rohbau3D: A Shell Construction Site 3D Point Cloud Dataset",
+    href: "https://www.nature.com/articles/s41597-025-05827-7",
+    role: "504 real LiDAR scans across 14 construction sites. Static, so nothing to track — but real backgrounds.",
+  },
+  {
+    title: "Argoverse 2",
+    href: "https://www.argoverse.org/av2.html",
+    role: "What the PyTorch reference implementations train on, and the reason their detector class lists have never heard of an excavator boom.",
+  },
+];
+---
+
+<Base
+  title="Papers — labelrefinery"
+  description="Every paper implemented in the labelrefinery stack, with links and where each one sits in the pipelines."
+>
+  <h1>Papers</h1>
+
+  <p class="lead">
+    Each of these is its own repository — a from-scratch implementation, most in
+    pure Mojo, several with a PyTorch reference alongside and numerical parity
+    verified stage by stage.
+  </p>
+
+  <h2>In the pipelines today</h2>
+
+  {
+    active.map((p) => (
+      <>
+        <h3>
+          <a href={p.href}>{p.title}</a>
+        </h3>
+        <p>
+          <em>{p.authors}</em> ·{" "}
+          <a href={`https://github.com/labelrefinery/${p.repo.replace(
+            "CenterPillars",
+            "CenterPillars.mojo",
+          )}`}>
+            <code>{p.repo}</code>
+          </a>{" "}
+          · used in <strong>{p.where}</strong>
+        </p>
+        <p>{p.role}</p>
+      </>
+    ))
+  }
+
+  <h2>Implemented, not yet in the default path</h2>
+
+  <p>
+    These are complete implementations. What holds each one back is stated
+    plainly rather than left as “future work”.
+  </p>
+
+  {
+    implemented.map((p) => (
+      <>
+        <h3>
+          <a href={p.href}>{p.title}</a>
+        </h3>
+        <p>
+          <em>{p.authors}</em> ·{" "}
+          <a href={`https://github.com/labelrefinery/${p.repo}`}>
+            <code>{p.repo}</code>
+          </a>{" "}
+          · <strong>{p.status}</strong>
+        </p>
+        <p>{p.role}</p>
+      </>
+    ))
+  }
+
+  <h2>Datasets referenced</h2>
+
+  <p>Not implemented — cited because they shaped decisions.</p>
+
+  {
+    referenced.map((p) => (
+      <>
+        <h3>
+          <a href={p.href}>{p.title}</a>
+        </h3>
+        <p>{p.role}</p>
+      </>
+    ))
+  }
+
+  <h2>Every repository</h2>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>Repository</th><th>What it is</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><a href="https://github.com/labelrefinery/sitegen"><code>sitegen</code></a></td><td>the synthetic scene generator and its scorer</td></tr>
+        <tr><td><a href="https://github.com/labelrefinery/Refinery"><code>Refinery</code></a></td><td>the pipelines, the workflows and the build journal</td></tr>
+        <tr><td><a href="https://github.com/labelrefinery/Stone.mojo"><code>Stone.mojo</code></a></td><td>annotation-free terrain</td></tr>
+        <tr><td><a href="https://github.com/labelrefinery/Hungarian.mojo"><code>Hungarian.mojo</code></a></td><td>rectangular linear assignment, gated</td></tr>
+        <tr><td><a href="https://github.com/labelrefinery/Kalman.mojo"><code>Kalman.mojo</code></a></td><td>filtering and RTS smoothing</td></tr>
+        <tr><td><a href="https://github.com/labelrefinery/OfflinePoly.mojo"><code>OfflinePoly.mojo</code></a></td><td>learning-free offline 3D MOT</td></tr>
+        <tr><td><a href="https://github.com/labelrefinery/CenterPillars.mojo"><code>CenterPillars.mojo</code></a> · <a href="https://github.com/labelrefinery/CenterPillars.py"><code>.py</code></a></td><td>3D LiDAR detection, inference and training</td></tr>
+        <tr><td><a href="https://github.com/labelrefinery/LabelFormer.mojo"><code>LabelFormer.mojo</code></a> · <a href="https://github.com/labelrefinery/LabelFormer.py"><code>.py</code></a></td><td>trajectory refinement</td></tr>
+        <tr><td><a href="https://github.com/labelrefinery/TrackPermanence.mojo"><code>TrackPermanence.mojo</code></a> · <a href="https://github.com/labelrefinery/TrackPermanence.py"><code>.py</code></a></td><td>occlusion recovery</td></tr>
+        <tr><td><a href="https://github.com/labelrefinery/GroundingDino.mojo"><code>GroundingDino.mojo</code></a></td><td>open-set detection from a text prompt</td></tr>
+      </tbody>
+    </table>
+  </div>
+</Base>

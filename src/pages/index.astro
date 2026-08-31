@@ -1,0 +1,112 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base
+  title="labelrefinery — offboard auto-labeling for construction sites"
+  description="Classical geometry and learned perception, implemented in Mojo, assembled into a labeling loop that starts with no labels at all and improves."
+>
+  <h1>Auto-labeling that starts with nothing</h1>
+
+  <p class="lead">
+    Offboard perception for construction sites, built from papers up. Classical
+    geometry and learned models, implemented in
+    <a href="https://www.modular.com/mojo">Mojo</a>, assembled into a loop that
+    begins with <strong>no labels at all</strong> and gets better each round.
+  </p>
+
+  <h2>The question</h2>
+
+  <p>
+    A pipeline that “starts unlabeled and improves” is only a meaningful claim
+    if something can score it. No public dataset lets you: they either have no
+    labels, so there is nothing to measure against, or they have them, so you
+    are not really starting unlabeled.
+  </p>
+
+  <p>
+    So the data came first — a synthetic construction scene carrying its own
+    held-out oracle, on one rule: <strong>only the scorer ever reads the
+    truth</strong>. Then the components. Then the loop.
+  </p>
+
+  <figure>
+    <picture>
+      <source
+        media="(prefers-color-scheme: dark)"
+        srcset="/assets/footprints-dark.png"
+      />
+      <img
+        src="/assets/footprints-light.png"
+        alt="Three panels showing every labelled box centre over a 60-second scene, for round 0, round 1 and round 2. Round 0 has a dense cluster of phantom labels inside the dashed stockpile footprints; round 1 still has them; round 2's stockpiles are empty."
+      />
+    </picture>
+    <figcaption>
+      Every labelled box centre over one 60-second scene. Round 0 is pure
+      geometry — it finds the machines and the workers, and also fits confident,
+      vehicle-shaped boxes to slivers of stockpile. Round 2, trained on its own
+      filtered output, leaves the piles alone.
+    </figcaption>
+  </figure>
+
+  <h2>What is here</h2>
+
+  <div class="cards">
+    <div class="card">
+      <h3><a href="/data">The data</a></h3>
+      <p>
+        A synthetic site with LiDAR, four cameras, proprioception and a held-out
+        oracle. Reproducible from a seed, byte for byte.
+      </p>
+    </div>
+    <div class="card">
+      <h3><a href="/pipelines">The pipelines</a></h3>
+      <p>
+        Three named workflows: discover instances from geometry, name them from
+        pixels, distil a detector and label again.
+      </p>
+    </div>
+    <div class="card">
+      <h3><a href="/results">Numbers &amp; learnings</a></h3>
+      <p>
+        What was measured, including the parts that went backwards and why they
+        did.
+      </p>
+    </div>
+    <div class="card">
+      <h3><a href="/papers">Papers</a></h3>
+      <p>
+        Eleven implementations, each its own repository, and where each one sits
+        in the pipeline.
+      </p>
+    </div>
+  </div>
+
+  <h2>The result worth reading twice</h2>
+
+  <pre><code>training labels   precision 0.865   recall 0.547
+student output    precision 0.921   recall 0.656</code></pre>
+
+  <p>
+    The distilled model is <strong>better than its own supervision on both
+    axes</strong>. It recovered objects the label filter had discarded and
+    rejected false positives the filter had let through.
+  </p>
+
+  <p>
+    That only happens above a threshold. Trained on the <em>unfiltered</em>
+    labels the round before, the same code went backwards — it inherited the
+    systematic errors and amplified them. Below some label-precision floor a
+    self-training loop compounds its own mistakes; above it, it compounds its
+    strengths. Finding roughly where that floor sits turned out to be more
+    useful than any single score.
+  </p>
+
+  <div class="note">
+    <p>
+      Everything on this site is measured on the machine, not estimated. Where a
+      number contradicted what had been written down first — which happened five
+      times — the number won and the write-up changed.
+    </p>
+  </div>
+</Base>

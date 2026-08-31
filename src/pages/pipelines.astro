@@ -1,0 +1,152 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base
+  title="Pipelines — labelrefinery"
+  description="Three named workflows: discover instances from geometry and motion, name them from cameras, and distil a detector that labels better."
+>
+  <h1>The pipelines</h1>
+
+  <p class="lead">
+    Three named workflows, each resumable and each recording what it did. They
+    are wiring, not algorithms — every stage is a component with its own
+    repository.
+  </p>
+
+  <h2>1 · geo_kinetic_discovery</h2>
+
+  <p>
+    <strong>No model, no checkpoint, no class list — and no class names out
+    either.</strong> What it produces is <em>instances</em>: a discrete something
+    is here, this is its box, this is its trajectory.
+  </p>
+
+  <pre><code>proprioception self-mask   forward kinematics from /ego/joint_states
+  → terrain classification   Stone.mojo — connectivity, not height
+  → voxel clustering         26-neighbourhood connected components
+  → oriented box fit         PCA heading in the ground plane
+  → gated association        Hungarian.mojo — solve_gated
+  → RTS smoothing            Kalman.mojo — smooth_track
+  → motion filter            the stage that decides whether the loop compounds</code></pre>
+
+  <p>What geometry and motion can actually settle:</p>
+
+  <ul>
+    <li><strong>Terrain against not-terrain</strong> — free and reliable.</li>
+    <li><strong>Instances</strong> — connected clusters standing on that terrain.</li>
+    <li>
+      <strong>Motion attributes</strong> — the strongest signal here by some
+      distance, and the one the whole loop turns on.
+    </li>
+    <li>
+      <strong>A size bucket</strong> — machine-sized and person-sized boxes
+      differ by two and a half orders of magnitude, and a 5 m³ split separates
+      them <span class="stat">97.5%</span> of the time.
+    </li>
+    <li>
+      <strong>The ego's own parts, exactly</strong> — kinematics knows which
+      rigid body is the boom. The one place geometry hands over true named
+      classes, free.
+    </li>
+  </ul>
+
+  <p>
+    What it can never settle: excavator against dozer; worker against any
+    person-shaped object; stockpile against spoil pile, where the discriminator
+    is <em>intent</em> and simply is not present in a point cloud.
+  </p>
+
+  <h3>Why terrain is a connectivity question</h3>
+
+  <p>
+    Ground removal by height fails on a stockpile: a pile at its 34° angle of
+    repose climbs 0.67 m across a one-metre cell, so the bottom is called ground
+    and the top third survives as slivers that cluster into vehicle-shaped
+    objects. Tightening the tolerance only trades those false positives for
+    missed objects near slopes.
+  </p>
+
+  <p>
+    So the ground surface is <em>grown</em>, not thresholded — seeded from the
+    cells the machine drove through, flooding outward one repose-limited step at
+    a time. A pile is continuous with the grade beneath it; a truck is a
+    three-metre jump. Height stops mattering, continuity starts mattering.
+  </p>
+
+  <h2>2 · bootstrap_new_classes</h2>
+
+  <p>
+    Gives those instances names, from two sources that fail in opposite
+    directions.
+  </p>
+
+  <pre><code>select views          where each instance projects largest and is in frame
+  → detect            Grounding DINO, prompt "excavator . haul truck . worker ."
+  → associate         detection ↔ projected 3D box, by IoU
+  → vote              aggregate across views, confidence-weighted
+  → size prior        for what the detector could not name</code></pre>
+
+  <p>
+    <strong>The detector names machines and cannot see people.</strong> Over ten
+    unobstructed views, nine returned <code>haul truck</code> with the correct
+    label; a worker visible in three of them was never detected once.
+    <strong>Geometry finds people and cannot name machines.</strong> So the
+    detector is asked only where it has a chance, and the size prior covers the
+    rest.
+  </p>
+
+  <p>
+    Every name carries <code>cls_conf</code> and <code>cls_source</code>, because
+    the two paths are not equally trustworthy — see
+    <a href="/results">the numbers</a>.
+  </p>
+
+  <h2>3 · improve_offboard_model</h2>
+
+  <p>
+    Distil a detector from existing labels, then use it to label better. Run it
+    repeatedly and it is a self-training loop.
+  </p>
+
+  <pre><code>filter labels        → the load-bearing parameter, not a knob
+  → training set     NPZ in the layout CenterPillars already reads
+  → train student    CenterPillars.py
+  → infer            CenterPillars.mojo
+  → track            the same association and smoothing as round 0
+  → score            against the held-out oracle</code></pre>
+
+  <p>
+    Nothing human-labelled enters at any point. The output is the same schema as
+    the input, so feeding one round's labels into the next is the loop.
+  </p>
+
+  <div class="note">
+    <p>
+      Whether that loop compounds or degrades is decided entirely by the filter
+      feeding it. On unfiltered labels the first round went
+      <em>backwards</em>. That is the single most important finding here, and it
+      is on <a href="/results">the numbers page</a>.
+    </p>
+  </div>
+
+  <h2>Running them</h2>
+
+  <pre><code>python -m workflows geo_kinetic_discovery \
+    --scene site.mcap --work runs/a --truth runs/a/truth.csv
+
+python -m workflows bootstrap_new_classes \
+    --scene site.mcap --work runs/a --labels runs/a/labels.csv
+
+python -m workflows improve_offboard_model \
+    --scene site.mcap --work runs/a --labels runs/a/labels.csv --round r1</code></pre>
+
+  <p>
+    Every stage declares its inputs, outputs and parameters; the run context
+    hashes them and skips any stage a previous run already produced. Re-running a
+    finished workflow costs a second and touches nothing. That is not only
+    convenience — durable-execution engines replay handlers, so idempotent steps
+    are what would make adopting one later a wrapping job rather than a rewrite.
+    The manifest doubles as the provenance record.
+  </p>
+</Base>

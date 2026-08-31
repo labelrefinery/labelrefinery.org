@@ -1,0 +1,152 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base
+  title="The data — labelrefinery"
+  description="A synthetic construction scene with LiDAR, cameras, proprioception and a held-out oracle. How to download it and view the labels in Foxglove."
+>
+  <h1>Seeing the data and the labels</h1>
+
+  <p class="lead">
+    The scene and every round of labels are published. Both open in
+    <a href="https://foxglove.dev">Foxglove</a> with no custom panel and nothing
+    to install.
+  </p>
+
+  <h2>Download</h2>
+
+  <pre><code>curl -O https://samples.magmalake.org/sitegen/v0.2.0/site_seed1_60s.mcap    #  86 MB
+curl -O https://samples.magmalake.org/sitegen/v0.2.0/labels_rounds.mcap     # 471 KB
+
+foxglove site_seed1_60s.mcap labels_rounds.mcap    # or drag both in at once</code></pre>
+
+  <p>
+    Foxglove merges multiple local files into a single playback timeline, so the
+    labels line up with the recording frame for frame. Predictions live in their
+    own file on purpose: the recording stays immutable, and one 86 MB scene
+    serves any number of pipeline runs.
+  </p>
+
+  <h2>What to turn on</h2>
+
+  <p>
+    Add a <strong>3D</strong> panel and set <em>display frame</em> to
+    <code>map</code>. Then:
+  </p>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>Topic</th><th>Schema</th><th></th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>/lidar/points</code></td>
+          <td><code>foxglove.PointCloud</code></td>
+          <td>the sweep — set <em>colour by</em> to <code>intensity</code></td>
+        </tr>
+        <tr>
+          <td><code>/ego/joint_states</code></td>
+          <td><code>foxglove.JointStates</code></td>
+          <td>swing, boom, stick, bucket</td>
+        </tr>
+        <tr>
+          <td><code>/camera/&lt;name&gt;/image</code></td>
+          <td><code>foxglove.CompressedImage</code></td>
+          <td>four cameras at the house corners</td>
+        </tr>
+        <tr>
+          <td><code>/terrain/heightmap</code></td>
+          <td><code>foxglove.PointCloud</code></td>
+          <td>ground and stockpiles, published once</td>
+        </tr>
+        <tr>
+          <td><code>/ground_truth/actors</code></td>
+          <td><code>foxglove.SceneUpdate</code></td>
+          <td><strong>held out</strong> — the oracle cuboids</td>
+        </tr>
+        <tr>
+          <td><code>/pred/*</code></td>
+          <td><code>foxglove.SceneUpdate</code></td>
+          <td>one topic per pipeline round, from the labels file</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    Scrub to <span class="stat">t ≈ 25 s</span>: round 0 has objects standing on
+    the stockpile and round 2 does not. That is the 824 → 136 false-positive
+    drop, visible rather than tabulated. Add a <strong>Plot</strong> panel on
+    <code>/ego/joint_states</code> for the dig cycle — it repeats every 15 s, and
+    the flat stretch at t ≈ 26–34 s is the machine walking to its second station.
+  </p>
+
+  <div class="note">
+    <p>
+      <code>/ground_truth/*</code> is the oracle. It is in the file so you can
+      <em>see</em> what a labeler was up against — a labeler must never read it.
+      Keeping the truth and the data in one recording is deliberate: the same
+      pass wrote both, so the truth cannot drift from what it describes.
+    </p>
+  </div>
+
+  <h2>What is in the scene</h2>
+
+  <p>
+    A 20-tonne excavator running a dig–swing–dump cycle, loading an articulated
+    hauler that backs in, is loaded and hauls off before a second truck takes its
+    place. Part-way through, the machine walks 6.5 m along the trench to a second
+    dig station — house squared up, boom tucked — and the hauler repositions with
+    it. A spotter holds station; a second worker crosses the swing radius. Two
+    stockpiles sit at the angle of repose, a row of grade stakes runs along the
+    north edge, and dust kicks up when the loaded truck pulls away.
+  </p>
+
+  <p>Four things are deliberate:</p>
+
+  <p>
+    <strong>The excavator is articulated.</strong> Base pose plus swing, boom,
+    stick and bucket — four degrees of freedom on top of the body. Every link is
+    its own ground-truth box, so a scorer can ask whether a labeler got the
+    <em>bucket</em> right, which is the part that will actually hit something.
+  </p>
+
+  <p>
+    <strong>Proprioception is a published topic.</strong> The machine's own joint
+    angles are free, exact labels. The LiDAR rides the house, so
+    <span class="stat">15%</span> of every sweep is the ego looking at itself,
+    and forward kinematics is what removes it before anything else runs.
+  </p>
+
+  <p>
+    <strong>The difficulty is in the sensor, not the scene.</strong> Points fall
+    off as 1/r², range noise grows with distance, dropout rises quadratically and
+    dust eats returns over a region. A worker at 14 m gets about 20 points.
+  </p>
+
+  <p>
+    <strong>Nothing is balanced.</strong> Terrain is ~83% of returns; the two
+    workers together are ~0.3%. Real class imbalance, not a curated benchmark.
+  </p>
+
+  <h2>Reproducing it</h2>
+
+  <p>
+    The scene is deterministic in its seed — two runs produce byte-identical
+    files, verified by checksum, so two pipelines under comparison consume
+    exactly the same input.
+  </p>
+
+  <pre><code>git clone https://github.com/labelrefinery/sitegen
+cd sitegen &amp;&amp; make install
+
+uv run sitegen generate --out site.mcap --seed 1 --duration 60 --camera-hz 1
+# sha256 b3140981...  the published file, byte for byte</code></pre>
+
+  <p>
+    <code>sitegen overlay</code> writes a label file from any tracker-schema CSV,
+    so your own pipeline's output can be viewed the same way.
+  </p>
+</Base>
