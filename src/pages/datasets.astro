@@ -186,60 +186,213 @@ snapshot    4612849022315…          ← the Iceberg snapshot this pins</code><
     schema to evolve, and the registry restores named-thing addressing on top.
   </p>
 
-  <h2>Looking at them</h2>
+  <h2 id="browse">Browse them here</h2>
 
   <p>
-    The scene has <a href="/data">Foxglove</a>, which is why the labels are easy
-    to look at. The tables have no equivalent: <strong>there is no Iceberg viewer
-    here, and none is planned.</strong> magmalake is a set of libraries — Parquet,
-    Avro, Thrift, Iceberg and the codecs, implemented in Mojo — not a console.
+    Two tables are published and readable in this page. Nothing is downloaded up
+    front and there is no server in the path: the browser reads the Iceberg
+    metadata, walks the manifests and pulls only the byte ranges of the Parquet
+    it needs, straight from where the tables are published — the same trick the
+    <a href="/data">Foxglove link</a> uses on the recording.
   </p>
+
+  <div class="viewer" id="viewer">
+    <div class="viewer-bar">
+      <label for="tablepick">Table</label>
+      <select id="tablepick">
+        <option value="ground_truth_tracks">ground_truth_tracks</option>
+        <option value="labels">labels</option>
+      </select>
+      <span class="viewer-status" id="status">loading…</span>
+      <span class="viewer-pager">
+        <button id="prev" type="button" disabled>‹ prev</button>
+        <button id="next" type="button" disabled>next ›</button>
+      </span>
+    </div>
+    <div class="scroll">
+      <table id="grid">
+        <thead><tr id="head"></tr></thead>
+        <tbody id="body"></tbody>
+      </table>
+    </div>
+    <p class="viewer-foot" id="foot"></p>
+  </div>
+
+  <noscript>
+    <div class="note">
+      <p>The table viewer needs JavaScript. The query recipes below do not.</p>
+    </div>
+  </noscript>
 
   <p>
-    So reading a dataset means querying it. Both of these already run against
-    magmalake tables as correctness oracles in its CI, so they are the supported
-    path rather than a workaround:
+    The viewer is <a href="https://github.com/hyparam/icebird">icebird</a>, a
+    pure-JavaScript Iceberg client — about 43 KB, no WebAssembly. It resolves the
+    table's current snapshot from <code>version-hint.text</code>, so the row you
+    are looking at is pinned to a specific snapshot id rather than to whatever
+    happens to be latest. That id is printed under the table.
   </p>
 
-  <pre><code>duckdb -c "SELECT class, count(*) FROM iceberg_scan('…/labels') GROUP BY 1"
+  <h3>Querying them instead</h3>
 
-python -c "import pyiceberg.catalog as c; \
-  c.load_catalog('magmalake').load_table('labelrefinery.labels').scan().to_arrow()"</code></pre>
+  <p>
+    For anything beyond looking, the tables are ordinary Iceberg and every engine
+    reads them. These work today against the published URLs:
+  </p>
+
+  <pre><code>duckdb -c "INSTALL iceberg; LOAD iceberg;
+  SELECT class, count(*), median(num_lidar_points)
+  FROM iceberg_scan('https://samples.magmalake.org/datasets/v0.1.0/ground_truth_tracks')
+  GROUP BY 1"</code></pre>
 
   <div class="note">
     <p>
-      The two viewing stories are different on purpose. A scene is something you
-      watch, and getting it wrong is obvious the moment you scrub the timeline. A
-      dataset is something you join, and getting it wrong looks like a plausible
-      number. The scene gets a viewer; the tables get a query engine and a pinned
-      snapshot.
+      A scene and a table fail differently, which is why they get different
+      tools. A scene is something you watch, and getting it wrong is obvious the
+      moment you scrub the timeline. A table is something you join, and getting
+      it wrong looks like a perfectly plausible number. So the table viewer shows
+      you the snapshot id and the null counts rather than only the pretty rows.
     </p>
   </div>
 
   <h2 id="status">Status</h2>
 
   <p>
-    Designed and specified; not built. No pipeline writes Iceberg today — the
-    workflows read and write CSV and NPZ addressed by path, which is what the
-    <a href="/pipelines">pipelines page</a> shows.
+    Two of the five kinds are populated, from the artefacts that were already
+    public rather than from a fresh pipeline run —
+    <code>ground_truth_tracks</code> (9 000 rows) and <code>labels</code>
+    (6 463 rows, the three rounds). That is migration steps 1 and 3 of the four
+    below. <code>scene</code>, <code>prompt</code> and <code>evaluation</code>
+    are still design only, and no pipeline <em>writes</em> Iceberg yet — these
+    tables were built by reading the published MCAPs.
   </p>
 
   <p>
-    The gap is smaller than it looks, and the reason is worth stating plainly:
-    the current CSVs already carry the right <em>columns</em>. What they are
-    missing is <em>identity</em>. Four moves close it — <code>sitegen truth</code>
-    to <code>ground_truth.tracks</code> with <code>num_lidar_points</code> added;
-    a new <code>sitegen views</code> export from the instance masks;
-    <code>name_instances.py</code>'s output to <code>labels</code>, its
-    <code>cls_source</code> and <code>cls_conf</code> already present; and the run
-    manifest to the registry.
+    Two honest gaps in what is published. <code>labels.class</code> is null for
+    every row: the published labels file is a visualisation artefact and carries
+    geometry and a track id but no class name, so there was nothing truthful to
+    put there — <code>cls_conf</code> and <code>cls_source</code> are null for
+    the same reason. And <code>num_lidar_points</code> is known on 1 800 of 9 000
+    rows, because the per-point oracle is published at 2 Hz while boxes are at
+    10 Hz; where a sweep exists a value of 0 means <em>seen and got no returns</em>,
+    and null elsewhere means <em>unknown</em>. The difference matters: 0 is what
+    makes “recall on objects with ≥ 5 returns” answerable.
   </p>
 
   <p>
-    The fourth is the one to notice. Every workflow already records its inputs,
-    outputs, params and hashes per step, into a JSON file per run — that is what
-    makes re-running a finished workflow cost a second. A dataset version is that
-    record with a name attached. <strong>This design does not add provenance
-    tracking; it moves provenance that already exists somewhere queryable.</strong>
+    That column immediately earns its keep. Across the whole scene the six grade
+    stakes never exceed <span class="stat">3</span> returns, while workers sit at
+    a median of <span class="stat">12</span> and trucks at
+    <span class="stat">143</span>. The stake is not a special case to be excluded
+    by name; it is the bottom of a distribution, and a threshold expresses that
+    without a hard-coded exception.
+  </p>
+
+  <p>
+    The remaining gap is smaller than it looks: the current CSVs already carry
+    the right <em>columns</em> and are missing <em>identity</em>. What is left is
+    a <code>sitegen views</code> export from the instance masks, real class names
+    plumbed through to <code>labels</code>, and the run manifest promoted to the
+    registry.
+  </p>
+
+  <p>
+    That last one is the one to notice. Every workflow already records its
+    inputs, outputs, params and hashes per step into a JSON file per run — that
+    is what makes re-running a finished workflow cost a second. A dataset version
+    is that record with a name attached. <strong>This design does not add
+    provenance tracking; it moves provenance that already exists somewhere
+    queryable.</strong>
   </p>
 </Base>
+
+<script type="module" is:inline>
+  const BASE = "https://samples.magmalake.org/datasets/v0.1.0";
+  const PAGE = 50;
+
+  const el = (id) => document.getElementById(id);
+  const state = { table: "ground_truth_tracks", start: 0, meta: null, total: 0 };
+
+  const fmt = (v) => {
+    if (v === null || v === undefined) return '<span class="null">null</span>';
+    if (typeof v === "number" && !Number.isInteger(v)) return v.toFixed(3);
+    return String(v);
+  };
+
+  let icebird;
+
+  async function load() {
+    el("status").textContent = "loading…";
+    el("prev").disabled = el("next").disabled = true;
+    try {
+      icebird ??= await import("https://cdn.jsdelivr.net/npm/icebird@0.8/+esm");
+      const tableUrl = `${BASE}/${state.table}`;
+      if (!state.meta || state.meta.__table !== state.table) {
+        const meta = await icebird.icebergMetadata({ tableUrl });
+        meta.__table = state.table;
+        state.meta = meta;
+        const snap = meta.snapshots?.find(
+          (s) => String(s["snapshot-id"]) === String(meta["current-snapshot-id"]),
+        );
+        state.total = Number(snap?.summary?.["total-records"] ?? 0);
+        state.snapshotId = String(meta["current-snapshot-id"]);
+      }
+      const meta = state.meta;
+      const fields = meta.schemas.find(
+        (s) => s["schema-id"] === meta["current-schema-id"],
+      ).fields;
+
+      const end = Math.min(state.start + PAGE, state.total || state.start + PAGE);
+      const rows = await icebird.icebergRead({
+        tableUrl,
+        metadata: meta,
+        rowStart: state.start,
+        rowEnd: end,
+      });
+
+      el("head").innerHTML = fields
+        .map((f) => `<th>${f.name}</th>`)
+        .join("");
+      el("body").innerHTML = rows
+        .map(
+          (r) =>
+            "<tr>" +
+            fields.map((f) => `<td>${fmt(r[f.name])}</td>`).join("") +
+            "</tr>",
+        )
+        .join("");
+
+      const nulls = fields
+        .map((f) => [f.name, rows.filter((r) => r[f.name] === null).length])
+        .filter(([, n]) => n > 0)
+        .map(([name, n]) => `${name} ${n}/${rows.length}`);
+
+      el("status").textContent =
+        `rows ${state.start + 1}–${state.start + rows.length} of ${state.total.toLocaleString()}`;
+      el("foot").innerHTML =
+        `snapshot <code>${state.snapshotId}</code>` +
+        (nulls.length ? ` · null on this page: ${nulls.join(", ")}` : "");
+      el("prev").disabled = state.start === 0;
+      el("next").disabled = state.start + rows.length >= state.total;
+    } catch (err) {
+      el("status").textContent = "could not load";
+      el("foot").textContent = String(err && err.message ? err.message : err);
+    }
+  }
+
+  el("tablepick").addEventListener("change", (e) => {
+    state.table = e.target.value;
+    state.start = 0;
+    state.meta = null;
+    load();
+  });
+  el("prev").addEventListener("click", () => {
+    state.start = Math.max(0, state.start - PAGE);
+    load();
+  });
+  el("next").addEventListener("click", () => {
+    state.start += PAGE;
+    load();
+  });
+
+  load();
+</script>

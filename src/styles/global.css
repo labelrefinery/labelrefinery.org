@@ -155,3 +155,69 @@ footer.site a { color: var(--ink-2); }
 }
 .button:hover { filter: brightness(1.08); }
 .button.ghost { background: transparent; color: var(--accent); border-color: var(--border); }
+
+/* Iceberg table viewer (/datasets) */
+.viewer {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  margin: 1.5rem 0;
+  overflow: hidden;
+}
+.viewer-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+.viewer-bar label { color: var(--ink-3); font-size: 0.86rem; }
+.viewer-bar select {
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 0.86rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.viewer-status {
+  color: var(--ink-2);
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+.viewer-pager { margin-left: auto; display: flex; gap: 0.4rem; }
+.viewer-pager button {
+  font: inherit;
+  font-size: 0.86rem;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.viewer-pager button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.viewer-pager button:disabled { opacity: 0.45; cursor: default; }
+.viewer .scroll { margin: 0; max-height: 26rem; overflow: auto; }
+.viewer table { font-size: 0.82rem; font-family: var(--mono); }
+.viewer thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-2);
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.viewer td { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.viewer .null { color: var(--ink-3); font-style: italic; }
+.viewer-foot {
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  border-top: 1px solid var(--border);
+  color: var(--ink-3);
+  font-size: 0.82rem;
+}
+.viewer-foot code { font-size: 0.95em; background: transparent; padding: 0; }
