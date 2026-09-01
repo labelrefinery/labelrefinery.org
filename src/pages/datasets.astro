@@ -233,16 +233,27 @@ snapshot    4612849022315…          ← the Iceberg snapshot this pins</code><
   <h2 id="status">Status</h2>
 
   <p>
-    The registry and the writer are real Mojo now — `refinery.datasets` holds
-    the single definition of every schema, and publishing a label set registers
-    <code>(name, version)</code> pinned to the snapshot it wrote, so a version
-    resolves to the same rows forever. Two of the five kinds are populated, from
-    the artefacts that were already public rather than from a fresh run —
+    The registry and the writers are real Mojo. <code>refinery.datasets</code>
+    holds the single definition of every schema, so the shape a pipeline writes
+    cannot drift from the shape the registry claims was written, and publishing
+    a label set registers <code>(name, version)</code> pinned to the snapshot it
+    wrote — a version resolves to the same rows forever.
+  </p>
+
+  <p>
+    <strong>Pipeline stages now write Iceberg directly</strong>, which was the
+    part that was missing. <code>publish_labels</code> appends a label version
+    and registers it; the two <a href="/pipelines#loop">planning stages</a>
+    append to <code>evaluations</code>, one row per metric per candidate, so a
+    scene ranking or a prompt comparison is queryable rather than printed.
     <code>ground_truth_tracks</code> (9 000 rows) and <code>labels</code>
-    (6 463 rows, the three rounds). That is migration steps 1 and 3 of the four
-    below. <code>scene</code>, <code>prompt</code> and <code>evaluation</code>
-    are still design only, and no pipeline <em>writes</em> Iceberg yet — these
-    tables were built by reading the published MCAPs.
+    (6 463 rows, three rounds) were migrated from the already-public artefacts.
+  </p>
+
+  <p>
+    <code>scene</code> and <code>prompt</code> have schemas but no writer yet —
+    prompt sets currently live in a CSV that <code>optimize_prompt</code> reads
+    directly. That is the next gap to close, and it is a writer, not a design.
   </p>
 
   <p>
@@ -267,20 +278,18 @@ snapshot    4612849022315…          ← the Iceberg snapshot this pins</code><
   </p>
 
   <p>
-    The remaining gap is smaller than it looks: the current CSVs already carry
-    the right <em>columns</em> and are missing <em>identity</em>. What is left is
-    a <code>sitegen views</code> export from the instance masks, real class names
-    plumbed through to <code>labels</code>, and the run manifest promoted to the
-    registry.
+    What is left is narrower than it sounds: a <code>sitegen views</code> export
+    from the instance masks, and real class names plumbed through to
+    <code>labels</code>. The current CSVs already carry the right
+    <em>columns</em>; what they were missing was <em>identity</em>.
   </p>
 
   <p>
-    That last one is the one to notice. Every workflow already records its
-    inputs, outputs, params and hashes per step into a JSON file per run — that
-    is what makes re-running a finished workflow cost a second. A dataset version
-    is that record with a name attached. <strong>This design does not add
-    provenance tracking; it moves provenance that already exists somewhere
-    queryable.</strong>
+    Which is the point of the whole exercise. Every stage already recorded its
+    inputs, outputs, params and hashes — that is what makes re-running a
+    finished stage cost a second. A dataset version is that record with a name
+    attached. <strong>This design did not add provenance tracking; it moved
+    provenance that already existed somewhere queryable.</strong>
   </p>
 </Base>
 

@@ -1,5 +1,6 @@
 ---
 import Base from "../layouts/Base.astro";
+import LoopDiagram from "../components/LoopDiagram.astro";
 ---
 
 <Base
@@ -202,32 +203,16 @@ import Base from "../layouts/Base.astro";
     </p>
   </div>
 
-  <h2>Running them</h2>
-
-  <pre><code>python -m workflows geo_kinetic_discovery \
-    --scene site.mcap --work runs/a --truth runs/a/truth.csv
-
-python -m workflows bootstrap_new_classes \
-    --scene site.mcap --work runs/a --labels runs/a/labels.csv
-
-python -m workflows improve_offboard_model \
-    --scene site.mcap --work runs/a --labels runs/a/labels.csv --round r1</code></pre>
-
-  <p>
-    Every stage declares its inputs, outputs and parameters; the ledger hashes
-    them and skips any stage a previous run already produced. Re-running a
-    finished workflow costs a second and touches nothing.
-  </p>
-
   <h2 id="loop">The loop as a service</h2>
 
   <p>
-    The commands above are the pipeline run by hand. The same stages also run as
-    a <a href="https://restate.dev">Restate</a> service, which is what makes the
-    loop able to <strong>stop and wait for a person</strong> — for days if it
-    needs to, holding no process while it waits — and to survive being killed
-    mid-stage.
+    The three workflows above are the stages. What runs them is a
+    <a href="https://restate.dev">Restate</a> service, which is what lets the
+    loop <strong>stop and wait for a person</strong> — for days if it needs to,
+    holding no process while it waits — and survive being killed mid-stage.
   </p>
+
+  <LoopDiagram />
 
   <p>
     One call advances a run by one stage: ask the router what is runnable,
@@ -249,29 +234,99 @@ python -m workflows improve_offboard_model \
         </tr>
         <tr>
           <td><code>inproc</code></td>
-          <td>pure Mojo the orchestrator runs itself: the label filter, the Iceberg publish</td>
+          <td>pure Mojo the orchestrator runs itself: the label filter, the planning stages, the Iceberg publish</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Deciding what to run next</h3>
+
+  <p>
+    <strong>Which stage runs next is a decision, and it is recorded.</strong>
+    The router assembles the legal stages — those whose inputs exist and whose
+    work the ledger has not already done — describes each one's inputs and
+    outputs, and asks a model to name exactly one. The answer is
+    <em>checked against that list, never trusted</em>: a model that invents a
+    stage, or names a real one that cannot run yet, is overridden by a random
+    legal pick.
+  </p>
+
+  <p>
+    Both the prompt and the verbatim answer are stored on the decision. That
+    matters more than it sounds: a router quietly falling back to chance and a
+    model that happens to agree with chance produce identical timelines unless
+    you kept the exchange. No model transport is wired up yet, so today every
+    decision <em>is</em> the fallback — and the timeline says so on each row,
+    which is the honest version of a feature that is half-built.
+  </p>
+
+  <h3>Two planning stages</h3>
+
+  <p>
+    Choosing the next stage is the small decision. Two larger ones are stages in
+    their own right, and both write their reasoning to the
+    <a href="/datasets">evaluations dataset</a> rather than returning a number
+    and forgetting it.
+  </p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Stage</th><th>Decides</th><th>On what signal</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>select_scene</code></td>
+          <td>Which scene is worth labelling next</td>
+          <td>
+            How <em>unresolved</em> it is — the fraction of tracks the detector
+            could not corroborate, plus how weakly the rest were named. Not
+            model uncertainty: that needs a model, and this has to work on round
+            zero when there is not one.
+          </td>
+        </tr>
+        <tr>
+          <td><code>optimize_prompt</code></td>
+          <td>Which prompt the naming step should use</td>
+          <td>
+            <em>Class coverage</em> over a gold set — what fraction of the
+            classes actually present the prompt's phrases can even express. A
+            prompt that cannot name a thing will never label it, so coverage is
+            a ceiling, computable without running the detector at all.
+          </td>
         </tr>
       </tbody>
     </table>
   </div>
 
   <p>
-    <strong>Which stage runs next is a decision, and it is recorded.</strong>
-    Today the router picks at random from whatever is legal — a stage whose
-    inputs exist and whose work the ledger has not already done — which is
-    deliberately the least interesting policy that still exercises the machinery
-    a model would need. Every choice is written down with the candidates it was
-    choosing between, so replacing the policy changes what gets picked and
-    nothing else.
+    Every candidate's score is written, not just the winner's. A selection you
+    cannot audit afterwards is indistinguishable from a coin toss.
   </p>
 
+  <h3>Where a person comes in</h3>
+
   <p>
-    Two guarantees that sound alike and are not. Restate's journal makes a
-    crashed run resume without redoing finished work <em>within one
-    invocation</em>. The content-hash ledger skips work across <em>separate</em>
-    runs. A stage is runnable when its inputs exist and the ledger lacks its
-    key — not when its outputs are missing, which would make a stage whose
-    inputs changed permanently ineligible and quietly serve stale results.
+    Two stages block on a human, and blocking is the point — the run genuinely
+    stops until someone answers.
+    <strong><code>gold_labeling</code></strong> asks for ground truth on a scene
+    from scratch, producing the small trusted set that
+    <code>optimize_prompt</code> is scored against.
+    <strong><code>human_review</code></strong> shows the labels a round
+    produced and takes corrections. Either way the edits are materialised as a
+    new immutable version of the labels dataset with
+    <code>cls_source = "human"</code>, so a correction is a citable artefact
+    rather than an edit that vanishes into a CSV.
+  </p>
+
+  <h3>Two guarantees that sound alike</h3>
+
+  <p>
+    Restate's journal makes a crashed run resume without redoing finished work
+    <em>within one invocation</em>. The content-hash ledger skips work across
+    <em>separate</em> runs. Hence the definition of runnable: inputs exist and
+    the ledger lacks the key — <em>not</em> that the outputs are missing, which
+    would make a stage whose inputs changed permanently ineligible and quietly
+    serve stale results forever.
   </p>
 
   <p class="actions">

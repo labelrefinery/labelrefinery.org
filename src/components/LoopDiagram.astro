@@ -1,0 +1,239 @@
+---
+// The architecture in one picture: what decides, what runs, what is recorded,
+// and the fact that the recording is what the deciding reads. Inline SVG so it
+// inherits the page's theme tokens and needs no script.
+//
+// Two things the arrows are deliberately careful about. The router fans out to
+// every stage rather than pointing at the first one -- it picks whichever is
+// legal, and drawing a sequence would claim a fixed order the code does not
+// have. And `train` has no arrow into RECORD because it writes a checkpoint,
+// not a dataset; giving it one would be tidier and false.
+---
+
+<figure class="diagram">
+  <svg viewBox="0 0 880 462" role="img" aria-labelledby="loop-title loop-desc">
+    <title id="loop-title">The labeling loop</title>
+    <desc id="loop-desc">
+      Three bands. Planning picks exactly one stage to run next. The pipeline
+      runs it, and the stages that produce rows write them into versioned
+      datasets, all of which are indexed by a registry that planning reads to
+      decide again. One stage in the middle of the pipeline is a person.
+    </desc>
+
+    <rect x="8" y="14" width="822" height="112" rx="10" class="band"></rect>
+    <rect x="8" y="170" width="822" height="112" rx="10" class="band"></rect>
+    <rect x="8" y="326" width="822" height="120" rx="10" class="band"></rect>
+
+    <text x="26" y="38" class="band-label">PLAN</text>
+    <text x="26" y="194" class="band-label">RUN</text>
+    <text x="26" y="350" class="band-label">RECORD</text>
+
+    <!-- plan -->
+    <g class="node plan">
+      <rect x="90" y="46" width="170" height="58" rx="8"></rect>
+      <text x="175" y="72">select_scene</text>
+      <text x="175" y="90" class="sub">what to label next</text>
+    </g>
+    <g class="node plan">
+      <rect x="300" y="46" width="180" height="58" rx="8"></rect>
+      <text x="390" y="72">router</text>
+      <text x="390" y="90" class="sub">what to run next</text>
+    </g>
+    <g class="node plan">
+      <rect x="520" y="46" width="200" height="58" rx="8"></rect>
+      <text x="620" y="72">optimize_prompt</text>
+      <text x="620" y="90" class="sub">which prompt wins</text>
+    </g>
+
+    <!-- the router picks one of the run stages, not the first of them -->
+    <g class="fan">
+      <path d="M390,104 L390,146"></path>
+      <path d="M390,146 L182,196" marker-end="url(#tip-fan)"></path>
+      <path d="M390,146 L316,196" marker-end="url(#tip-fan)"></path>
+      <path d="M390,146 L466,196" marker-end="url(#tip-fan)"></path>
+      <path d="M390,146 L612,196" marker-end="url(#tip-fan)"></path>
+      <path d="M390,146 L742,196" marker-end="url(#tip-fan)"></path>
+    </g>
+    <text x="512" y="136" class="note fan-note">picks exactly one</text>
+
+    <!-- run -->
+    <g class="node run">
+      <rect x="120" y="202" width="118" height="48" rx="8"></rect>
+      <text x="179" y="232">geometry</text>
+    </g>
+    <g class="node run">
+      <rect x="256" y="202" width="118" height="48" rx="8"></rect>
+      <text x="315" y="232">naming</text>
+    </g>
+    <g class="node human">
+      <rect x="392" y="202" width="152" height="48" rx="8"></rect>
+      <text x="468" y="225">gold · review</text>
+      <text x="468" y="242" class="sub">a person</text>
+    </g>
+    <g class="node run">
+      <rect x="562" y="202" width="110" height="48" rx="8"></rect>
+      <text x="617" y="232">train</text>
+    </g>
+    <g class="node run">
+      <rect x="690" y="202" width="118" height="48" rx="8"></rect>
+      <text x="749" y="232">score</text>
+    </g>
+
+    <!-- record -->
+    <g class="node data">
+      <rect x="240" y="358" width="150" height="48" rx="8"></rect>
+      <text x="315" y="388">labels</text>
+    </g>
+    <g class="node data">
+      <rect x="430" y="358" width="140" height="48" rx="8"></rect>
+      <text x="500" y="388">registry</text>
+    </g>
+    <g class="node data">
+      <rect x="600" y="358" width="180" height="48" rx="8"></rect>
+      <text x="690" y="388">evaluations</text>
+    </g>
+
+    <g class="flow">
+      <path d="M179,250 L272,354" marker-end="url(#tip)"></path>
+      <path d="M315,250 L315,354" marker-end="url(#tip)"></path>
+      <path d="M468,250 L356,354" marker-end="url(#tip)"></path>
+      <path d="M749,250 L700,354" marker-end="url(#tip)"></path>
+      <path d="M390,382 L426,382" marker-end="url(#tip)"></path>
+      <path d="M598,382 L574,382" marker-end="url(#tip)"></path>
+      <path
+        class="feedback"
+        d="M500,406 L500,428 L850,428 L850,75 L724,75"
+        marker-end="url(#tip-feedback)"></path>
+    </g>
+    <text x="838" y="304" class="note feedback-note">read back</text>
+
+    <defs>
+      <marker
+        id="tip"
+        viewBox="0 0 10 10"
+        refX="9"
+        refY="5"
+        markerWidth="6"
+        markerHeight="6"
+        orient="auto-start-reverse"
+      >
+        <path d="M 0 0 L 10 5 L 0 10 z" class="tip"></path>
+      </marker>
+      <marker
+        id="tip-fan"
+        viewBox="0 0 10 10"
+        refX="9"
+        refY="5"
+        markerWidth="5"
+        markerHeight="5"
+        orient="auto-start-reverse"
+      >
+        <path d="M 0 0 L 10 5 L 0 10 z" class="tip-fan"></path>
+      </marker>
+      <marker
+        id="tip-feedback"
+        viewBox="0 0 10 10"
+        refX="9"
+        refY="5"
+        markerWidth="6"
+        markerHeight="6"
+        orient="auto-start-reverse"
+      >
+        <path d="M 0 0 L 10 5 L 0 10 z" class="tip-feedback"></path>
+      </marker>
+    </defs>
+  </svg>
+  <figcaption>
+    Planning picks one stage, the pipeline runs it, and whatever rows it
+    produces become a new immutable version — indexed by the registry that
+    planning reads to decide again. <code>train</code> is the one stage with no
+    arrow down: it writes a checkpoint, not a dataset.
+  </figcaption>
+</figure>
+
+<style>
+  .diagram {
+    margin: 2rem 0;
+  }
+  .diagram svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .band {
+    fill: var(--surface-2);
+    stroke: var(--border);
+  }
+  .band-label {
+    fill: var(--ink-3);
+    font:
+      600 11px var(--sans);
+    letter-spacing: 0.12em;
+  }
+  .node rect {
+    fill: var(--surface);
+    stroke: var(--border);
+    stroke-width: 1.5;
+  }
+  .node text {
+    text-anchor: middle;
+    fill: var(--ink);
+    font:
+      600 14px var(--sans);
+  }
+  .node text.sub {
+    fill: var(--ink-3);
+    font:
+      400 11px var(--sans);
+  }
+  .node.plan rect {
+    stroke: var(--accent);
+  }
+  .node.human rect {
+    stroke: var(--accent-2);
+    stroke-width: 2;
+  }
+  .node.data rect {
+    stroke: var(--accent-3);
+  }
+  .flow path {
+    fill: none;
+    stroke: var(--ink-3);
+    stroke-width: 1.5;
+  }
+  .flow path.feedback {
+    stroke: var(--accent-3);
+    stroke-dasharray: 5 4;
+  }
+  /* Lighter than the data flow: this is the choice, not the movement. */
+  .fan path {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1;
+    opacity: 0.55;
+  }
+  .tip {
+    fill: var(--ink-3);
+  }
+  .tip-fan {
+    fill: var(--accent);
+  }
+  .tip-feedback {
+    fill: var(--accent-3);
+  }
+  .note {
+    fill: var(--ink-3);
+    font:
+      400 11px var(--sans);
+    text-anchor: middle;
+  }
+  /* Classes, not text-anchor attributes: a presentation attribute loses to the
+     `.note` rule above, so it would silently do nothing. */
+  .note.feedback-note {
+    fill: var(--accent-3);
+    text-anchor: end;
+  }
+  .note.fan-note {
+    fill: var(--accent);
+  }
+</style>
