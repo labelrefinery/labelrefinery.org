@@ -17,28 +17,15 @@ import Base from "../layouts/Base.astro";
   <h2>Open it in the browser</h2>
 
   <p>
-    Foxglove's web app can stream both files straight from where they are
-    published — nothing to download, nothing to install.
+    The scene and every round of labels open in Foxglove on the
+    <a href="https://demo.labelrefinery.org/data">demo site</a> — nothing to download, nothing to
+    install. The 86 MB recording is read over HTTP range requests, so playback
+    starts without pulling the whole file.
   </p>
 
   <p class="actions">
-    <a class="button" href="https://app.foxglove.dev/~/view?ds=remote-file&ds.url=https%3A%2F%2Fsamples.magmalake.org%2Fsitegen%2Fv0.2.0%2Fsite_seed1_60s.mcap&ds.url=https%3A%2F%2Fsamples.magmalake.org%2Fsitegen%2Fv0.2.0%2Flabels_rounds.mcap">Open the scene and every round of labels →</a>
-    <a class="button ghost" href="https://app.foxglove.dev/~/view?ds=remote-file&ds.url=https%3A%2F%2Fsamples.magmalake.org%2Fsitegen%2Fv0.2.0%2Fsite_seed1_60s.mcap">Scene only →</a>
+    <a class="button" href="https://demo.labelrefinery.org/data">Open the scene on the demo →</a>
   </p>
-
-  <p>
-    The 86 MB recording is read over HTTP range requests, so playback starts
-    without pulling the whole file. Then follow
-    <a href="#what-to-turn-on">what to turn on</a> below.
-  </p>
-
-  <div class="note">
-    <p>
-      If the viewer cannot reach the files, download them instead — the local
-      path below is identical once they are open, and Foxglove merges the two
-      files into one timeline either way.
-    </p>
-  </div>
 
   <h2>Download</h2>
 

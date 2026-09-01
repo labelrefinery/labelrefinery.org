@@ -4,7 +4,7 @@ import Base from "../layouts/Base.astro";
 
 <Base
   title="Datasets — labelrefinery"
-  description="Every artefact the system produces or consumes is a named, versioned, immutable dataset with recorded lineage. Iceberg on magmalake, Parquet underneath — two tables published and browsable in the page."
+  description="Every artefact the system produces or consumes is a named, versioned, immutable dataset with recorded lineage. Iceberg on magmalake, Parquet underneath, written natively from Mojo."
 >
   <h1>Everything is a dataset</h1>
 
@@ -17,13 +17,12 @@ import Base from "../layouts/Base.astro";
 
   <div class="note">
     <p>
-      <strong>Two of the five kinds are live and you can page through them
-      <a href="#browse">further down this page</a>.</strong> The design is
+      <strong>Two of the five kinds are live, and you can page through them on
+      the <a href="https://demo.labelrefinery.org/datasets">demo site</a>.</strong> The design is
       written up in
       <a href="https://github.com/labelrefinery/Refinery/blob/main/docs/DATASETS.md"
         ><code>docs/DATASETS.md</code></a
-      >, and the registry and resolver exist in
-      <code>workflows/datasets.py</code>. What is still missing, and which
+      >, and the registry and resolver are in <code>refinery/datasets.mojo</code>. What is still missing, and which
       columns are null in what is published, is in
       <a href="#status">status</a> at the bottom.
     </p>
@@ -188,50 +187,25 @@ snapshot    4612849022315…          ← the Iceberg snapshot this pins</code><
     schema to evolve, and the registry restores named-thing addressing on top.
   </p>
 
-  <h2 id="browse">Browse them here</h2>
+  <h2 id="browse">Browsing them</h2>
 
   <p>
-    Two tables are published and readable in this page. Nothing is downloaded up
-    front and there is no server in the path: the browser reads the Iceberg
-    metadata, walks the manifests and pulls only the byte ranges of the Parquet
-    it needs, straight from where the tables are published — the same trick the
-    <a href="/data">Foxglove link</a> uses on the recording.
+    Two tables are published and readable in the browser on the demo site.
+    Nothing is downloaded up front and there is no server in the path: the
+    browser reads the Iceberg metadata, walks the manifests and pulls only the
+    byte ranges of Parquet it needs, straight from where the tables are
+    published — the same trick Foxglove uses on the recording.
   </p>
 
-  <div class="viewer" id="viewer">
-    <div class="viewer-bar">
-      <label for="tablepick">Table</label>
-      <select id="tablepick">
-        <option value="ground_truth_tracks">ground_truth_tracks</option>
-        <option value="labels">labels</option>
-      </select>
-      <span class="viewer-status" id="status">loading…</span>
-      <span class="viewer-pager">
-        <button id="prev" type="button" disabled>‹ prev</button>
-        <button id="next" type="button" disabled>next ›</button>
-      </span>
-    </div>
-    <div class="scroll">
-      <table id="grid">
-        <thead><tr id="head"></tr></thead>
-        <tbody id="body"></tbody>
-      </table>
-    </div>
-    <p class="viewer-foot" id="foot"></p>
-  </div>
-
-  <noscript>
-    <div class="note">
-      <p>The table viewer needs JavaScript. The query recipes below do not.</p>
-    </div>
-  </noscript>
+  <p class="actions">
+    <a class="button" href="https://demo.labelrefinery.org/datasets">Browse the tables on the demo →</a>
+  </p>
 
   <p>
-    The viewer is <a href="https://github.com/hyparam/icebird">icebird</a>, a
-    pure-JavaScript Iceberg client — about 43 KB, no WebAssembly. It resolves the
-    table's current snapshot from <code>version-hint.text</code>, so the row you
-    are looking at is pinned to a specific snapshot id rather than to whatever
-    happens to be latest. That id is printed under the table.
+    The viewer there is <a href="https://github.com/hyparam/icebird">icebird</a>,
+    about 43 KB of pure JavaScript with no WebAssembly. It resolves the table's
+    current snapshot from <code>version-hint.text</code>, so a row is pinned to
+    a snapshot id rather than to whatever happens to be latest.
   </p>
 
   <h3>Querying them instead</h3>
@@ -259,8 +233,11 @@ snapshot    4612849022315…          ← the Iceberg snapshot this pins</code><
   <h2 id="status">Status</h2>
 
   <p>
-    Two of the five kinds are populated, from the artefacts that were already
-    public rather than from a fresh pipeline run —
+    The registry and the writer are real Mojo now — `refinery.datasets` holds
+    the single definition of every schema, and publishing a label set registers
+    <code>(name, version)</code> pinned to the snapshot it wrote, so a version
+    resolves to the same rows forever. Two of the five kinds are populated, from
+    the artefacts that were already public rather than from a fresh run —
     <code>ground_truth_tracks</code> (9 000 rows) and <code>labels</code>
     (6 463 rows, the three rounds). That is migration steps 1 and 3 of the four
     below. <code>scene</code>, <code>prompt</code> and <code>evaluation</code>
@@ -307,94 +284,3 @@ snapshot    4612849022315…          ← the Iceberg snapshot this pins</code><
   </p>
 </Base>
 
-<script type="module" is:inline>
-  const BASE = "https://samples.magmalake.org/datasets/v0.2.0";
-  const PAGE = 50;
-
-  const el = (id) => document.getElementById(id);
-  const state = { table: "ground_truth_tracks", start: 0, meta: null, total: 0 };
-
-  const fmt = (v) => {
-    if (v === null || v === undefined) return '<span class="null">null</span>';
-    if (typeof v === "number" && !Number.isInteger(v)) return v.toFixed(3);
-    return String(v);
-  };
-
-  let icebird;
-
-  async function load() {
-    el("status").textContent = "loading…";
-    el("prev").disabled = el("next").disabled = true;
-    try {
-      icebird ??= await import("https://cdn.jsdelivr.net/npm/icebird@0.8/+esm");
-      const tableUrl = `${BASE}/${state.table}`;
-      if (!state.meta || state.meta.__table !== state.table) {
-        const meta = await icebird.icebergMetadata({ tableUrl });
-        meta.__table = state.table;
-        state.meta = meta;
-        const snap = meta.snapshots?.find(
-          (s) => String(s["snapshot-id"]) === String(meta["current-snapshot-id"]),
-        );
-        state.total = Number(snap?.summary?.["total-records"] ?? 0);
-        state.snapshotId = String(meta["current-snapshot-id"]);
-      }
-      const meta = state.meta;
-      const fields = meta.schemas.find(
-        (s) => s["schema-id"] === meta["current-schema-id"],
-      ).fields;
-
-      const end = Math.min(state.start + PAGE, state.total || state.start + PAGE);
-      const rows = await icebird.icebergRead({
-        tableUrl,
-        metadata: meta,
-        rowStart: state.start,
-        rowEnd: end,
-      });
-
-      el("head").innerHTML = fields
-        .map((f) => `<th>${f.name}</th>`)
-        .join("");
-      el("body").innerHTML = rows
-        .map(
-          (r) =>
-            "<tr>" +
-            fields.map((f) => `<td>${fmt(r[f.name])}</td>`).join("") +
-            "</tr>",
-        )
-        .join("");
-
-      const nulls = fields
-        .map((f) => [f.name, rows.filter((r) => r[f.name] === null).length])
-        .filter(([, n]) => n > 0)
-        .map(([name, n]) => `${name} ${n}/${rows.length}`);
-
-      el("status").textContent =
-        `rows ${state.start + 1}–${state.start + rows.length} of ${state.total.toLocaleString()}`;
-      el("foot").innerHTML =
-        `snapshot <code>${state.snapshotId}</code>` +
-        (nulls.length ? ` · null on this page: ${nulls.join(", ")}` : "");
-      el("prev").disabled = state.start === 0;
-      el("next").disabled = state.start + rows.length >= state.total;
-    } catch (err) {
-      el("status").textContent = "could not load";
-      el("foot").textContent = String(err && err.message ? err.message : err);
-    }
-  }
-
-  el("tablepick").addEventListener("change", (e) => {
-    state.table = e.target.value;
-    state.start = 0;
-    state.meta = null;
-    load();
-  });
-  el("prev").addEventListener("click", () => {
-    state.start = Math.max(0, state.start - PAGE);
-    load();
-  });
-  el("next").addEventListener("click", () => {
-    state.start += PAGE;
-    load();
-  });
-
-  load();
-</script>

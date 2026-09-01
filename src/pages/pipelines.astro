@@ -4,14 +4,15 @@ import Base from "../layouts/Base.astro";
 
 <Base
   title="Pipelines — labelrefinery"
-  description="Three named workflows: discover instances from geometry and motion, name them from cameras, and distil a detector that labels better."
+  description="Three named workflows — discover instances from geometry and motion, name them from cameras, distil a detector that labels better — driven by a durable loop that can stop for a human."
 >
   <h1>The pipelines</h1>
 
   <p class="lead">
     Three named workflows, each resumable and each recording what it did. They
     are wiring, not algorithms — every stage is a component with its own
-    repository.
+    repository. They also run as a
+    <a href="#loop">durable service</a> that can stop and ask a human.
   </p>
 
   <h2 id="geo">1 · geo_kinetic_discovery</h2>
@@ -213,11 +214,67 @@ python -m workflows improve_offboard_model \
     --scene site.mcap --work runs/a --labels runs/a/labels.csv --round r1</code></pre>
 
   <p>
-    Every stage declares its inputs, outputs and parameters; the run context
-    hashes them and skips any stage a previous run already produced. Re-running a
-    finished workflow costs a second and touches nothing. That is not only
-    convenience — durable-execution engines replay handlers, so idempotent steps
-    are what would make adopting one later a wrapping job rather than a rewrite.
-    The manifest doubles as the provenance record.
+    Every stage declares its inputs, outputs and parameters; the ledger hashes
+    them and skips any stage a previous run already produced. Re-running a
+    finished workflow costs a second and touches nothing.
+  </p>
+
+  <h2 id="loop">The loop as a service</h2>
+
+  <p>
+    The commands above are the pipeline run by hand. The same stages also run as
+    a <a href="https://restate.dev">Restate</a> service, which is what makes the
+    loop able to <strong>stop and wait for a person</strong> — for days if it
+    needs to, holding no process while it waits — and to survive being killed
+    mid-stage.
+  </p>
+
+  <p>
+    One call advances a run by one stage: ask the router what is runnable,
+    record the decision, run it, record the outcome. A stage runs one of three
+    ways, and the timeline says which:
+  </p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Executor</th><th>What runs there</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>subprocess</code></td>
+          <td><code>sitegen</code> and the training scripts, spawned with their output captured</td>
+        </tr>
+        <tr>
+          <td><code>mojo</code></td>
+          <td>a handler on the executor service — in-process, no compile per call</td>
+        </tr>
+        <tr>
+          <td><code>inproc</code></td>
+          <td>pure Mojo the orchestrator runs itself: the label filter, the Iceberg publish</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    <strong>Which stage runs next is a decision, and it is recorded.</strong>
+    Today the router picks at random from whatever is legal — a stage whose
+    inputs exist and whose work the ledger has not already done — which is
+    deliberately the least interesting policy that still exercises the machinery
+    a model would need. Every choice is written down with the candidates it was
+    choosing between, so replacing the policy changes what gets picked and
+    nothing else.
+  </p>
+
+  <p>
+    Two guarantees that sound alike and are not. Restate's journal makes a
+    crashed run resume without redoing finished work <em>within one
+    invocation</em>. The content-hash ledger skips work across <em>separate</em>
+    runs. A stage is runnable when its inputs exist and the ledger lacks its
+    key — not when its outputs are missing, which would make a stage whose
+    inputs changed permanently ineligible and quietly serve stale results.
+  </p>
+
+  <p class="actions">
+    <a class="button" href="https://demo.labelrefinery.org">Watch it run →</a>
   </p>
 </Base>

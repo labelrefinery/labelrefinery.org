@@ -50,8 +50,8 @@ import Base from "../layouts/Base.astro";
   </figure>
 
   <p class="actions">
-    <a class="button" href="https://app.foxglove.dev/~/view?ds=remote-file&ds.url=https%3A%2F%2Fsamples.magmalake.org%2Fsitegen%2Fv0.2.0%2Fsite_seed1_60s.mcap&ds.url=https%3A%2F%2Fsamples.magmalake.org%2Fsitegen%2Fv0.2.0%2Flabels_rounds.mcap">Open the data in Foxglove →</a>
-    <a class="button ghost" href="/data">How to read it →</a>
+    <a class="button" href="https://demo.labelrefinery.org">Watch the loop run →</a>
+    <a class="button ghost" href="/pipelines">How it works →</a>
   </p>
 
   <h2>What each pipeline actually produces</h2>
@@ -139,6 +139,13 @@ import Base from "../layouts/Base.astro";
 
   <div class="cards">
     <div class="card">
+      <h3><a href="https://demo.labelrefinery.org">The live demo</a></h3>
+      <p>
+        The loop as a running service: every stage in the order it ran, what the
+        router chose between, and the scene and labels to look at.
+      </p>
+    </div>
+    <div class="card">
       <h3><a href="/data">The data</a></h3>
       <p>
         A synthetic site with LiDAR, four cameras, proprioception and a held-out
@@ -148,15 +155,16 @@ import Base from "../layouts/Base.astro";
     <div class="card">
       <h3><a href="/pipelines">The pipelines</a></h3>
       <p>
-        Three named workflows: discover instances from geometry, name them from
-        pixels, distil a detector and label again.
+        Discover instances from geometry, name them from pixels, distil a
+        detector and label again — driven by a durable loop that can stop and
+        ask a human.
       </p>
     </div>
     <div class="card">
       <h3><a href="/datasets">Datasets</a></h3>
       <p>
         Scenes, truth, prompts, labels and scores as one versioned, immutable
-        kind of thing. Iceberg on magmalake — designed, not yet built.
+        kind of thing. Iceberg on magmalake, written natively from Mojo.
       </p>
     </div>
     <div class="card">
@@ -177,8 +185,8 @@ import Base from "../layouts/Base.astro";
 
   <h2>The result worth reading twice</h2>
 
-  <pre><code>training labels   precision 0.865   recall 0.547
-student output    precision 0.921   recall 0.656</code></pre>
+  <pre><code>training labels   precision 0.865   recall 0.547   f1 0.670
+student output    precision 0.903   recall 0.654   f1 0.759</code></pre>
 
   <p>
     The distilled model is <strong>better than its own supervision on both
