@@ -1,8 +1,11 @@
 ---
 import "../styles/global.css";
+import { POSTHOG_KEY } from "../data/site";
 
 const { title, description } = Astro.props;
 const path = Astro.url.pathname.replace(/\/$/, "") || "/";
+
+const posthogEnabled = POSTHOG_KEY.startsWith("phc_");
 
 const nav = [
   { href: "/", label: "Overview" },
@@ -25,6 +28,31 @@ const nav = [
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
     <link rel="canonical" href={new URL(path, Astro.site)} />
+
+    {/*
+      PostHog product analytics, proxied first-party through /ph (see
+      worker/posthog-proxy.js) so ad-blockers don't drop it. `persistence:
+      'memory'` means no cookies and no localStorage, so there is nothing to
+      disclose and no consent banner is needed. `api_host` is derived from
+      `location.origin` at runtime rather than hardcoded so this works the
+      same on the apex domain, on www., and under `wrangler dev`.
+    */}
+    {posthogEnabled && (
+      <>
+        <script defer src="/ph/static/array.js"></script>
+        <script is:inline define:vars={{ POSTHOG_KEY }}>
+          window.addEventListener("DOMContentLoaded", function () {
+            if (window.posthog) posthog.init(POSTHOG_KEY, {
+              api_host: location.origin + '/ph',
+              ui_host: 'https://us.posthog.com',
+              defaults: '2025-05-24',
+              persistence: 'memory',
+              capture_exceptions: true
+            });
+          });
+        </script>
+      </>
+    )}
   </head>
   <body>
     <header class="site">
