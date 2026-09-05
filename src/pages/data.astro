@@ -19,7 +19,7 @@ import Base from "../layouts/Base.astro";
   <p>
     The scene and every round of labels open in Foxglove on the
     <a href="https://demo.labelrefinery.org/data">demo site</a> — nothing to download, nothing to
-    install. The 86 MB recording is read over HTTP range requests, so playback
+    install. The 100 MB recording is read over HTTP range requests, so playback
     starts without pulling the whole file.
   </p>
 
@@ -29,15 +29,15 @@ import Base from "../layouts/Base.astro";
 
   <h2>Download</h2>
 
-  <pre><code>curl -O https://samples.magmalake.org/sitegen/v0.2.0/site_seed1_60s.mcap    #  86 MB
-curl -O https://samples.magmalake.org/sitegen/v0.2.0/labels_rounds.mcap     # 471 KB
+  <pre><code>curl -O https://samples.magmalake.org/sitegen/v0.3.0/site_seed1_60s.mcap    # 100 MB
+curl -O https://samples.magmalake.org/sitegen/v0.3.0/labels_rounds.mcap     # 347 KB
 
 foxglove site_seed1_60s.mcap labels_rounds.mcap    # or drag both in at once</code></pre>
 
   <p>
     Foxglove merges multiple local files into a single playback timeline, so the
     labels line up with the recording frame for frame. Predictions live in their
-    own file on purpose: the recording stays immutable, and one 86 MB scene
+    own file on purpose: the recording stays immutable, and one 100 MB scene
     serves any number of pipeline runs.
   </p>
 
@@ -72,12 +72,19 @@ foxglove site_seed1_60s.mcap labels_rounds.mcap    # or drag both in at once</co
         <tr>
           <td><code>/terrain/heightmap</code></td>
           <td><code>foxglove.PointCloud</code></td>
-          <td>ground and stockpiles, published once</td>
+          <td>ground and stockpiles — at t₀, and again each time the bucket
+            changes them</td>
         </tr>
         <tr>
           <td><code>/ground_truth/actors</code></td>
           <td><code>foxglove.SceneUpdate</code></td>
           <td><strong>held out</strong> — the oracle cuboids</td>
+        </tr>
+        <tr>
+          <td><code>/ground_truth/volumes</code></td>
+          <td><code>foxglove.JointStates</code></td>
+          <td><strong>held out</strong> — cubic metres cut, carried, hauled and
+            left standing; open it in a <strong>Plot</strong> panel</td>
         </tr>
         <tr>
           <td><code>/pred/*</code></td>
@@ -90,7 +97,7 @@ foxglove site_seed1_60s.mcap labels_rounds.mcap    # or drag both in at once</co
 
   <p>
     Scrub to <span class="stat">t ≈ 25 s</span>: round 0 has objects standing on
-    the stockpile and round 2 does not. That is the 824 → 136 false-positive
+    the stockpile and round 2 does not. That is the 617 → 177 false-positive
     drop, visible rather than tabulated. Add a <strong>Plot</strong> panel on
     <code>/ego/joint_states</code> for the dig cycle — it repeats every 15 s, and
     the flat stretch at t ≈ 26–34 s is the machine walking to its second station.
@@ -143,8 +150,8 @@ foxglove site_seed1_60s.mcap labels_rounds.mcap    # or drag both in at once</co
     sweeps from four Ousters on a working Liebherr R924. At the default ray
     budget a worker at 14 m gets <span class="stat">6</span> returns; at
     <code>--density real</code>, the real rig's budget, <span class="stat">40</span>
-    — against 141 on the real machine. The published v0.2.0 recording predates
-    this calibration.
+    — against 141 on the real machine. The published v0.3.0 recording is the
+    first one made with it.
   </p>
 
   <p>
@@ -158,16 +165,37 @@ foxglove site_seed1_60s.mcap labels_rounds.mcap    # or drag both in at once</co
   <h2>Reproducing it</h2>
 
   <p>
-    The scene is deterministic in its seed — two runs produce byte-identical
-    files, verified by checksum, so two pipelines under comparison consume
-    exactly the same input.
+    The scene is deterministic in its seed, and the part a pipeline reads is
+    deterministic to the byte. Two runs produce identical sweeps, poses, oracle
+    cuboids, per-point and per-pixel instance ids, volumes and heightmaps —
+    every topic a labeler or a scorer touches, verified by checksum — so two
+    pipelines under comparison consume exactly the same input.
+  </p>
+
+  <p>
+    The four Cycles colour images are the exception, and it is worth being
+    precise about it. Path tracing is not bit-reproducible run to run, so
+    between two otherwise identical runs about
+    <span class="stat">1–5%</span> of pixels differ, by at most 16 of 255 —
+    sampling noise rather than a different picture, but enough to move the
+    file's checksum. Pin the published file by URL when the images have to match
+    too; regenerate when only the LiDAR and the truth matter.
   </p>
 
   <pre><code>git clone https://github.com/labelrefinery/sitegen
 cd sitegen &amp;&amp; make install
 
-uv run sitegen generate --out site.mcap --seed 1 --duration 60 --camera-hz 1
-# sha256 b3140981...  the published file, byte for byte</code></pre>
+mkdir -p assets
+curl -o assets/kloofendal_43d_clear_puresky_2k.hdr https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/kloofendal_43d_clear_puresky_2k.hdr
+curl -o assets/gravel_diff_2k.jpg   https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel/gravel_diff_2k.jpg
+curl -o assets/gravel_rough_2k.jpg  https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel/gravel_rough_2k.jpg
+curl -o assets/gravel_nor_gl_2k.jpg https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel/gravel_nor_gl_2k.jpg
+
+uv run sitegen generate --out site.mcap --seed 1 --duration 60 \
+    --camera-hz 1 --camera-renderer cycles --camera-assets assets
+# 10 min, 100 MB
+# sha256 5109120d...  the published file. The LiDAR and every
+#                     ground-truth topic reproduce exactly.</code></pre>
 
   <p>
     <code>sitegen overlay</code> writes a label file from any tracker-schema CSV,

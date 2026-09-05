@@ -217,7 +217,7 @@ snapshot    4612849022315…          ← the Iceberg snapshot this pins</code><
 
   <pre><code>duckdb -c "INSTALL iceberg; LOAD iceberg;
   SELECT class, count(*), median(num_lidar_points)
-  FROM iceberg_scan('https://samples.magmalake.org/datasets/v0.2.0/ground_truth_tracks')
+  FROM iceberg_scan('https://samples.magmalake.org/datasets/v0.3.0/ground_truth_tracks')
   GROUP BY 1"</code></pre>
 
   <div class="note">
@@ -246,8 +246,8 @@ snapshot    4612849022315…          ← the Iceberg snapshot this pins</code><
     and registers it; the two <a href="/pipelines#loop">planning stages</a>
     append to <code>evaluations</code>, one row per metric per candidate, so a
     scene ranking or a prompt comparison is queryable rather than printed.
-    <code>ground_truth_tracks</code> (9 000 rows) and <code>labels</code>
-    (6 463 rows, three rounds) were migrated from the already-public artefacts.
+    <code>ground_truth_tracks</code> (9 410 rows) and <code>labels</code>
+    (4 620 rows, three rounds) were migrated from the already-public artefacts.
   </p>
 
   <p>
