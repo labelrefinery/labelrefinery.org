@@ -129,19 +129,30 @@ foxglove site_seed1_60s.mcap labels_rounds.mcap    # or drag both in at once</co
   <p>
     <strong>Proprioception is a published topic.</strong> The machine's own joint
     angles are free, exact labels. The LiDAR rides the house, so
-    <span class="stat">15%</span> of every sweep is the ego looking at itself,
-    and forward kinematics is what removes it before anything else runs.
+    <span class="stat">27%</span> of every sweep is the ego looking at itself
+    — against 28% measured on a real excavator-mounted rig — and forward
+    kinematics is what removes it before anything else runs.
   </p>
 
   <p>
     <strong>The difficulty is in the sensor, not the scene.</strong> Points fall
     off as 1/r², range noise grows with distance, dropout rises quadratically and
-    dust eats returns over a region. A worker at 14 m gets about 20 points.
+    dust eats returns over a region. The numbers are measured, not invented: the
+    elevation band, range, ray budget and per-class intensity were calibrated
+    against <a href="https://goose-dataset.de/">GOOSE-Ex</a>, 2,164 labelled
+    sweeps from four Ousters on a working Liebherr R924. At the default ray
+    budget a worker at 14 m gets <span class="stat">6</span> returns; at
+    <code>--density real</code>, the real rig's budget, <span class="stat">40</span>
+    — against 141 on the real machine. The published v0.2.0 recording predates
+    this calibration.
   </p>
 
   <p>
-    <strong>Nothing is balanced.</strong> Terrain is ~83% of returns; the two
-    workers together are ~0.3%. Real class imbalance, not a curated benchmark.
+    <strong>Nothing is balanced.</strong> Terrain is ~70% of returns, the
+    machine's own body 27%, and the two workers together
+    <span class="stat">0.08%</span>. Real class imbalance, not a curated
+    benchmark — and it got four times as severe once the worker was a person
+    rather than a cuboid and the elevation band matched the real machine's.
   </p>
 
   <h2>Reproducing it</h2>
